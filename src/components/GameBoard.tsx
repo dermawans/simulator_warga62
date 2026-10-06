@@ -2,15 +2,7 @@ import React from 'react';
 import { BoardTile, Player, EconomicCondition } from '../types/game';
 import { formatShortRupiah } from '../utils/formatters';
 import { UPGRADE_TIERS } from '../data/boardTiles';
-
-export interface StartBonusNotification {
-  id: number;
-  text: string;
-  playerName: string;
-  playerAvatar?: string;
-  playerColor?: string;
-  subtext?: string;
-}
+import simulatorWniBanner from '../assets/images/simulator_wni_banner_1791190534170.jpg';
 
 interface GameBoardProps {
   tiles: BoardTile[];
@@ -25,7 +17,6 @@ interface GameBoardProps {
   hoppingPlayerId?: string | null;
   stepHighlightedTileId?: number | null;
   liquidatingTileIds?: number[];
-  startBonusNotification?: StartBonusNotification | null;
 }
 
 // Function to map tile index to 13x13 grid coordinates
@@ -69,39 +60,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   recentLog,
   hoppingPlayerId,
   stepHighlightedTileId,
-  liquidatingTileIds = [],
-  startBonusNotification = null
+  liquidatingTileIds = []
 }) => {
   return (
     <div className="relative w-full max-w-[960px] aspect-square mx-auto p-1.5 sm:p-3 bg-[#e2d5b5] rounded-3xl comic-box-lg select-none shadow-2xl">
-      {/* Floating START Bonus Popup (Meluncur ke Atas) */}
-      {startBonusNotification && (
-        <div
-          key={startBonusNotification.id}
-          className="absolute bottom-16 sm:bottom-24 left-3 sm:left-6 z-50 pointer-events-none animate-slide-up-float"
-        >
-          <div className="relative bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl border-2 sm:border-3 border-slate-950 shadow-2xl flex items-center gap-2.5 comic-box-sm animate-pulse-glow">
-            <span className="text-2xl sm:text-3xl animate-bounce">💵</span>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black font-comic text-yellow-300 drop-shadow-sm whitespace-nowrap">
-                  {startBonusNotification.text}
-                </span>
-                <span className="text-[9px] bg-emerald-950/80 text-emerald-200 px-1.5 py-0.2 rounded font-mono font-bold uppercase">
-                  START
-                </span>
-              </div>
-              <p className="text-[10px] text-emerald-100 font-bold leading-tight">
-                {startBonusNotification.playerName} {startBonusNotification.subtext ? `· ${startBonusNotification.subtext}` : ''}
-              </p>
-            </div>
-
-            {/* Little pointer triangle aiming at petak START */}
-            <div className="absolute -bottom-2 left-6 w-3 h-3 bg-emerald-700 border-r-2 border-b-2 border-slate-950 rotate-45" />
-          </div>
-        </div>
-      )}
-
       {/* 13x13 Grid Container */}
       <div 
         style={{
@@ -249,7 +211,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="relative my-auto flex flex-col items-center justify-center py-1 sm:py-2">
             <div className="w-full max-h-36 sm:max-h-48 rounded-xl overflow-hidden border-2 border-slate-900 relative shadow-md">
               <img
-                src="/src/assets/images/simulator_wni_banner_1791190534170.jpg"
+                src={simulatorWniBanner}
                 alt="Simulator WNI Satir Monopoli"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center"

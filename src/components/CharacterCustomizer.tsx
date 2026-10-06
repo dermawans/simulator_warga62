@@ -3,6 +3,7 @@ import { Player, CharacterPreset } from '../types/game';
 import { CHARACTER_PRESETS, ACCESSORIES_OPTIONS } from '../data/characters';
 import { soundManager } from '../utils/audio';
 import { Users, Bot, Sparkles, Play, Shield, RefreshCw } from 'lucide-react';
+import simulatorWniBanner from '../assets/images/simulator_wni_banner_1791190534170.jpg';
 
 interface CharacterCustomizerProps {
   onStartGame: (players: Player[]) => void;
@@ -131,7 +132,7 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
 
         <div className="w-full md:w-1/2 rounded-2xl overflow-hidden comic-box shadow-lg">
           <img
-            src="/src/assets/images/simulator_wni_banner_1791190534170.jpg"
+            src={simulatorWniBanner}
             alt="Simulator WNI Game Banner"
             referrerPolicy="no-referrer"
             className="w-full h-48 object-cover"
