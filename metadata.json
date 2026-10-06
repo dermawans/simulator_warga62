@@ -1,0 +1,6 @@
+{
+  "name": "Simulator WNI: Monopoli Satir Kehidupan Nyata",
+  "description": "Game monopoli satir kehidupan nyata Indonesia dengan ekonomi dinamis, investasi properti kota-kota nusantara, sistem korupsi & karma KPK, razia polisi, arisan warga, serta kustomisasi karakter kocak.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
