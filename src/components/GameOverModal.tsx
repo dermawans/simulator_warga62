@@ -63,7 +63,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             PERMAINAN SELESAI
           </span>
           <h2 className="text-2xl sm:text-3xl font-black font-comic uppercase tracking-tight mt-1">
-            PENOBATAN SULTAN WNI
+            PENOBATAN SULTAN WARGA62
           </h2>
           <p className="text-xs font-bold text-slate-800 uppercase mt-0.5">
             {getReasonTitle()}

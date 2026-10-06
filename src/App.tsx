@@ -37,6 +37,12 @@ import { PlayersOverviewBar } from './components/PlayersOverviewBar';
 import { KarmaInfoModal } from './components/KarmaInfoModal';
 import { GameOverModal } from './components/GameOverModal';
 import { LiquidationEffectModal, LiquidatedPropertyInfo } from './components/LiquidationEffectModal';
+import { SaveLoadModal } from './components/SaveLoadModal';
+import { GameSaveData } from './utils/supabase';
+import { OnlineLobbyModal } from './components/OnlineLobbyModal';
+import { OnlineChatDrawer } from './components/OnlineChatDrawer';
+import { multiplayerService } from './services/multiplayer';
+import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -50,6 +56,10 @@ export default function App() {
   const [stepHighlightedTileId, setStepHighlightedTileId] = useState<number | null>(null);
   const [liquidatingTileIds, setLiquidatingTileIds] = useState<number[]>([]);
   const [startBonusPopup, setStartBonusPopup] = useState<StartBonusNotification | null>(null);
+  const [saveLoadModalOpen, setSaveLoadModalOpen] = useState(false);
+  const [onlineLobbyOpen, setOnlineLobbyOpen] = useState(false);
+  const [multiplayerRoom, setMultiplayerRoom] = useState<RoomState | null>(null);
+  const [onlineChatMessages, setOnlineChatMessages] = useState<ChatMessage[]>([]);
   const [liquidatingPropsModal, setLiquidatingPropsModal] = useState<{
     playerName: string;
     playerAvatar: string;
@@ -58,7 +68,7 @@ export default function App() {
     totalCashRecovered: number;
   } | null>(null);
   const [hasRolled, setHasRolled] = useState(false);
-  const [recentLog, setRecentLog] = useState<string>('Selamat datang di Simulator WNI!');
+  const [recentLog, setRecentLog] = useState<string>('Selamat datang di Simulator Warga62!');
   const [arisanPot, setArisanPot] = useState<number>(6500000);
   const [roundCount, setRoundCount] = useState<number>(1);
   const [gameOverData, setGameOverData] = useState<{
@@ -297,6 +307,146 @@ export default function App() {
     };
   }, [gameState, activePlayerIndex, hasRolled, isRolling, isHopping]);
 
+  // Remote Multiplayer Listeners
+  useEffect(() => {
+    const unsubAction = multiplayerService.onGameAction((action, senderId) => {
+      switch (action.type) {
+        case 'ROLL_DICE':
+          soundManager.playDiceRoll();
+          setDiceRoll(action.dice);
+          setHasRolled(true);
+          movePlayer(action.steps);
+          break;
+
+        case 'BUY_PROPERTY': {
+          soundManager.playMoney();
+          setTiles((prev) => {
+            const next = [...prev];
+            next[action.tileId] = {
+              ...next[action.tileId],
+              ownerId: senderId,
+            };
+            return next;
+          });
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = next.findIndex((p) => p.id === senderId);
+            const tile = tiles[action.tileId];
+            if (pIdx !== -1 && tile) {
+              next[pIdx] = {
+                ...next[pIdx],
+                money: Math.max(0, next[pIdx].money - tile.price),
+              };
+            }
+            return next;
+          });
+          break;
+        }
+
+        case 'UPGRADE_PROPERTY': {
+          soundManager.playMoney();
+          setTiles((prev) => {
+            const next = [...prev];
+            next[action.tileId] = {
+              ...next[action.tileId],
+              houses: action.newHouses,
+            };
+            return next;
+          });
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = next.findIndex((p) => p.id === senderId);
+            const tile = tiles[action.tileId];
+            if (pIdx !== -1 && tile) {
+              next[pIdx] = {
+                ...next[pIdx],
+                money: Math.max(0, next[pIdx].money - tile.housePrice),
+              };
+            }
+            return next;
+          });
+          break;
+        }
+
+        case 'SELL_PROPERTY': {
+          const tile = tiles[action.tileId];
+          if (!tile) break;
+          const refund = Math.round(tile.price * 0.75 + tile.houses * tile.housePrice * 0.75);
+          soundManager.playMoney();
+          soundManager.playRoaringFire();
+          soundManager.playBurningPaper();
+          setTiles((prev) => {
+            const next = [...prev];
+            next[action.tileId] = {
+              ...next[action.tileId],
+              ownerId: null,
+              houses: 0,
+            };
+            return next;
+          });
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = next.findIndex((p) => p.id === senderId);
+            if (pIdx !== -1) {
+              next[pIdx] = {
+                ...next[pIdx],
+                money: next[pIdx].money + refund,
+              };
+            }
+            return next;
+          });
+          break;
+        }
+
+        case 'PAY_BAIL': {
+          soundManager.playMoney();
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = next.findIndex((p) => p.id === senderId);
+            if (pIdx !== -1) {
+              next[pIdx] = {
+                ...next[pIdx],
+                inJail: false,
+                jailTurns: 0,
+                money: Math.max(0, next[pIdx].money - action.amount),
+              };
+            }
+            return next;
+          });
+          break;
+        }
+
+        case 'END_TURN': {
+          setActivePlayerIndex(action.nextPlayerIndex);
+          setRoundCount(action.roundCount);
+          setHasRolled(false);
+          setIsRolling(false);
+          setIsHopping(false);
+          break;
+        }
+
+        case 'FULL_STATE_SYNC': {
+          setPlayers(action.players);
+          setTiles(action.tiles);
+          setActivePlayerIndex(action.activePlayerIndex);
+          setRoundCount(action.roundCount);
+          setArisanPot(action.arisanPot);
+          setEconomicIndex(action.economicIndex);
+          break;
+        }
+      }
+    });
+
+    const unsubChat = multiplayerService.onChatMessage((msg) => {
+      setOnlineChatMessages((prev) => [...prev.slice(-25), msg]);
+    });
+
+    return () => {
+      unsubAction();
+      unsubChat();
+    };
+  }, [tiles, players, activePlayerIndex, roundCount, multiplayerRoom]);
+
   // Audio toggle
   const handleToggleAudio = () => {
     const muted = soundManager.toggleMute();
@@ -312,21 +462,67 @@ export default function App() {
     setRecentLog(`Permainan dimulai! Giliran pertama: ${configuredPlayers[0].name}.`);
   };
 
+  // Start game from online multiplayer lobby
+  const handleStartMultiplayerGame = (room: RoomState, roomPlayers: RoomPlayer[]) => {
+    const onlinePlayers: Player[] = roomPlayers.map((rp) => ({
+      id: rp.id,
+      name: rp.name,
+      role: 'Warga Online',
+      characterId: 'pejabat',
+      avatarEmoji: rp.avatarEmoji,
+      accessory: rp.accessory || 'HP & Kuota',
+      quote: rp.quote || 'Siap mabar jadi Sultan!',
+      color: rp.color,
+      money: 20000000,
+      position: 0,
+      inJail: false,
+      jailTurns: 0,
+      karma: 0,
+      totalBribes: 0,
+      totalTaxesPaid: 0,
+      sabotagesRemaining: 2,
+      isBankrupt: false,
+      isBot: false,
+    }));
+
+    setPlayers(onlinePlayers);
+    setMultiplayerRoom(room);
+    setTiles(INITIAL_BOARD_TILES);
+    setActivePlayerIndex(0);
+    setRoundCount(1);
+    setArisanPot(6500000);
+    setEconomicIndex(0);
+    setEconomicTurnCountdown(5);
+    setGameState('PLAYING');
+    setHasRolled(false);
+    setGameOverData(null);
+    setRecentLog(`🌐 Permainan Mabar Online dimulai di Room ${room.code}!`);
+  };
+
   // Roll Dice & Move
-  const handleRollDice = () => {
+  const handleRollDice = (customRoll?: [number, number]) => {
     if (isRolling || hasRolled || isHopping || !activePlayer) return;
 
     setIsRolling(true);
     soundManager.playDiceRoll();
 
     setTimeout(() => {
-      const d1 = Math.floor(Math.random() * 6) + 1;
-      const d2 = Math.floor(Math.random() * 6) + 1;
+      const d1 = customRoll ? customRoll[0] : Math.floor(Math.random() * 6) + 1;
+      const d2 = customRoll ? customRoll[1] : Math.floor(Math.random() * 6) + 1;
       const totalSteps = d1 + d2;
 
       setDiceRoll([d1, d2]);
       setIsRolling(false);
       setHasRolled(true);
+
+      // Broadcast to other players if in online room
+      if (multiplayerRoom && !customRoll) {
+        multiplayerService.sendAction({
+          type: 'ROLL_DICE',
+          dice: [d1, d2],
+          steps: totalSteps,
+        });
+      }
 
       movePlayer(totalSteps);
     }, 600);
@@ -989,7 +1185,7 @@ export default function App() {
             : reason === 'ROUNDS_COMPLETED'
             ? `Pemenang Tertinggi Setelah ${rounds} Ronde!`
             : 'Seluruh Pesaing Pailit dan Mengibarkan Bendera Putih',
-        story: `Dengan kelihaian berinvestasi, lobi proyek, dan manajemen risiko yang matang, ${winner.name} resmi dinyatakan sebagai Sultan Tertinggi di Simulator WNI!`,
+        story: `Dengan kelihaian berinvestasi, lobi proyek, dan manajemen risiko yang matang, ${winner.name} resmi dinyatakan sebagai Sultan Tertinggi di Simulator Warga62!`,
         quoteWarga: 'Memang auranya sudah aura konglomerat sejak awal.',
       },
     });
@@ -1093,6 +1289,21 @@ export default function App() {
     setRecentLog('Permainan direset.');
   };
 
+  // Load Game Progress from Cloud or Local Storage
+  const handleLoadGame = (data: GameSaveData) => {
+    setPlayers(data.players);
+    setTiles(data.tiles);
+    setActivePlayerIndex(data.current_player_index);
+    setRoundCount(data.round_count);
+    setArisanPot(data.arisan_pot);
+    setEconomicIndex(data.economic_index);
+    setEconomicTurnCountdown(data.economic_turn_countdown);
+    setGameState('PLAYING');
+    setHasRolled(false);
+    setGameOverData(null);
+    setRecentLog(`📂 Progres permainan berhasil dimuat (Kode: ${data.save_code})!`);
+  };
+
   return (
     <div className="min-h-screen bg-[#f7eed9] text-slate-900 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
       {/* Top Bar (strict 3-zone contract) */}
@@ -1101,6 +1312,9 @@ export default function App() {
         onToggleAudio={handleToggleAudio}
         onOpenLeaderboard={() => setLeaderboardOpen(true)}
         onOpenRules={() => setRulesOpen(true)}
+        onOpenSaveLoad={() => setSaveLoadModalOpen(true)}
+        onOpenMultiplayer={() => setOnlineLobbyOpen(true)}
+        multiplayerRoomCode={multiplayerRoom?.code}
         onResetGame={handleResetGame}
         inGame={gameState === 'PLAYING'}
       />
@@ -1108,7 +1322,11 @@ export default function App() {
       {/* Main View Area */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 flex flex-col items-center">
         {gameState === 'SETUP' ? (
-          <CharacterCustomizer onStartGame={handleStartGame} />
+          <CharacterCustomizer
+            onStartGame={handleStartGame}
+            onOpenSaveLoad={() => setSaveLoadModalOpen(true)}
+            onOpenOnlineMultiplayer={() => setOnlineLobbyOpen(true)}
+          />
         ) : (
           <div className="w-full space-y-4">
             {/* Round & Victory Target Status Banner */}
@@ -1205,7 +1423,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-300 bg-amber-100/50 py-3 text-center text-xs text-slate-600 font-medium">
-        Simulator WNI © 2026 · Game Monopoli Satir Kehidupan Nyata Indonesia
+        Simulator Warga62 © 2026 · Game Monopoli Satir Kehidupan Nyata Indonesia
       </footer>
 
       {/* MODALS */}
@@ -1343,6 +1561,42 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 13. Save / Load Progress Modal (Supabase Cloud + Local Backup) */}
+      <SaveLoadModal
+        isOpen={saveLoadModalOpen}
+        onClose={() => setSaveLoadModalOpen(false)}
+        gameState={{
+          players,
+          tiles,
+          roundCount,
+          activePlayerIndex,
+          arisanPot,
+          economicIndex,
+          economicTurnCountdown,
+        }}
+        onLoadGame={handleLoadGame}
+      />
+
+      {/* 14. Online Multiplayer Room Lobby Modal */}
+      <OnlineLobbyModal
+        isOpen={onlineLobbyOpen}
+        onClose={() => setOnlineLobbyOpen(false)}
+        onStartMultiplayerGame={(room, roomPlayers) => {
+          handleStartMultiplayerGame(room, roomPlayers);
+          setOnlineLobbyOpen(false);
+        }}
+      />
+
+      {/* 15. Online Chat Drawer (Real-Time in-game chat) */}
+      {multiplayerRoom && gameState === 'PLAYING' && (
+        <OnlineChatDrawer
+          messages={onlineChatMessages}
+          currentUserName={activePlayer?.name || 'Warga'}
+          currentUserAvatar={activePlayer?.avatarEmoji || '🇮🇩'}
+          currentUserColor={activePlayer?.color || '#0284c7'}
+        />
       )}
     </div>
   );

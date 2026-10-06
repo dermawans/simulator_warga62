@@ -2,15 +2,19 @@ import React, { useState } from 'react';
 import { Player, CharacterPreset } from '../types/game';
 import { CHARACTER_PRESETS, ACCESSORIES_OPTIONS } from '../data/characters';
 import { soundManager } from '../utils/audio';
-import { Users, Bot, Sparkles, Play, Shield, RefreshCw } from 'lucide-react';
+import { Users, Bot, Sparkles, Play, Shield, RefreshCw, Globe } from 'lucide-react';
 import simulatorWniBanner from '../assets/images/simulator_wni_banner_1791190534170.jpg';
 
 interface CharacterCustomizerProps {
   onStartGame: (players: Player[]) => void;
+  onOpenSaveLoad?: () => void;
+  onOpenOnlineMultiplayer?: () => void;
 }
 
 export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
-  onStartGame
+  onStartGame,
+  onOpenSaveLoad,
+  onOpenOnlineMultiplayer
 }) => {
   const [mode, setMode] = useState<'SINGLE_BOT' | 'MULTIPLAYER'>('SINGLE_BOT');
   const [playerCount, setPlayerCount] = useState<number>(3);
@@ -123,7 +127,7 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black font-comic text-slate-900 leading-tight">
-            SIMULATOR WNI
+            SIMULATOR WARGA62
           </h1>
           <p className="text-sm text-slate-700 leading-relaxed font-medium">
             Selamat datang di game monopoli satir kehidupan Indonesia! Bangun kerajaan properti dari lapak kaki lima sampai megaproyek IKN, lobi proyek bawah meja, awasi meteran Karma KPK, dan menang arisan RT!
@@ -140,6 +144,40 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
         </div>
       </div>
 
+      {/* Featured Banner: Mabar Online Room Lobby */}
+      {onOpenOnlineMultiplayer && (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-4 sm:p-5 border-4 border-slate-900 comic-box shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 border-2 border-white/40 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+              <Globe className="w-7 h-7 text-yellow-300 animate-spin-slow" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black font-comic text-base sm:text-lg text-yellow-300 tracking-wide uppercase">
+                  🌐 Mau Main Bareng Teman (Mabar Online)?
+                </h3>
+                <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Fitur Baru
+                </span>
+              </div>
+              <p className="text-xs text-blue-100 mt-0.5 font-medium leading-relaxed">
+                Bikin room privat atau gabung room pakai <strong>Room Code</strong> untuk main real-time dari HP/Laptop masing-masing!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              soundManager.playBoing();
+              onOpenOnlineMultiplayer();
+            }}
+            className="w-full sm:w-auto px-5 py-3 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black font-comic text-sm uppercase tracking-wider rounded-2xl border-3 border-slate-900 comic-box-sm shadow-lg shrink-0 flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <span>Buka Lobi Kamar (Room Lobby)</span>
+            <span className="text-lg">→</span>
+          </button>
+        </div>
+      )}
+
       {/* Mode & Player Count Selectors */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Game Mode */}
@@ -147,7 +185,7 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
           <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
             1. Pilih Mode Permainan:
           </label>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               onClick={() => {
                 setMode('SINGLE_BOT');
@@ -176,9 +214,41 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
               }`}
             >
               <Users className="w-5 h-5 text-emerald-600 mb-1" />
-              <p className="font-bold text-xs text-slate-900 font-comic">Multipemain (Pass & Play)</p>
-              <p className="text-[10px] text-slate-500">Main bareng teman di 1 layar, saling sabotase!</p>
+              <p className="font-bold text-xs text-slate-900 font-comic">Lokal 1 Layar (Pass & Play)</p>
+              <p className="text-[10px] text-slate-500">Main gantian di 1 HP/Laptop bareng teman</p>
             </button>
+
+            {onOpenOnlineMultiplayer && (
+              <button
+                onClick={() => {
+                  soundManager.playBoing();
+                  onOpenOnlineMultiplayer();
+                }}
+                className="p-3 rounded-xl border-2 border-slate-900 text-left transition-all cursor-pointer bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-600 text-white shadow-md hover:scale-[1.02] sm:col-span-2 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-white/20 text-yellow-300">
+                    <Globe className="w-5 h-5 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-black text-xs font-comic text-yellow-300 uppercase tracking-wide">
+                        Mabar Online Real-Time!
+                      </p>
+                      <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.2 rounded font-black uppercase">
+                        Baru
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-blue-100">
+                      Bikin room atau gabung room teman via Room Code untuk main dari HP/Laptop masing-masing
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold bg-white text-blue-900 px-3 py-1.5 rounded-xl shrink-0 font-comic">
+                  Buka Room →
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -354,14 +424,25 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
           </div>
         </div>
 
-        {/* Start Game Button */}
-        <button
-          onClick={handleStart}
-          className="w-full py-4 px-6 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-base font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-3 shadow-lg cursor-pointer"
-        >
-          <Play className="w-5 h-5 fill-current" />
-          Mulai Permainan Simulator WNI!
-        </button>
+        {/* Action Buttons: Start or Load */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleStart}
+            className="flex-1 py-4 px-6 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-base font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-3 shadow-lg cursor-pointer"
+          >
+            <Play className="w-5 h-5 fill-current" />
+            Mulai Permainan Baru!
+          </button>
+          {onOpenSaveLoad && (
+            <button
+              onClick={onOpenSaveLoad}
+              className="py-4 px-6 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Lanjut Game (Cloud)
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

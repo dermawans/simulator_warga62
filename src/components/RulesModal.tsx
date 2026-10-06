@@ -13,7 +13,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ onClose }) => {
         <div className="bg-slate-900 text-yellow-300 p-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <BookOpen className="w-5 h-5" />
-            <h3 className="text-lg font-bold font-comic">Panduan & Tata Tertib WNI</h3>
+            <h3 className="text-lg font-bold font-comic">Panduan & Tata Tertib Warga62</h3>
           </div>
           <button
             onClick={onClose}
@@ -30,11 +30,11 @@ export const RulesModal: React.FC<RulesModalProps> = ({ onClose }) => {
               <Award className="w-4 h-4 text-amber-500" /> 1. Kondisi Game Over & Cara Menang
             </h4>
             <p>
-              Permainan Simulator WNI memiliki 3 kondisi <strong>GAME OVER & Kemenangan</strong>:
+              Permainan Simulator Warga62 memiliki 3 kondisi <strong>GAME OVER & Kemenangan</strong>:
             </p>
             <ul className="list-disc pl-5 space-y-1 mt-1 font-medium">
               <li>
-                <strong>Kemenangan Eliminasi (Bangkrut Total)</strong>: Singkirkan seluruh warga lawan! Lawan yang kehabisan uang kas DAN seluruh aset propertinya habis disita bank akan dinyatakan <em>Pailit</em>. Warga terakhir yang bertahan dinobatkan sebagai <strong>Sultan Tunggal WNI</strong>.
+                <strong>Kemenangan Eliminasi (Bangkrut Total)</strong>: Singkirkan seluruh warga lawan! Lawan yang kehabisan uang kas DAN seluruh aset propertinya habis disita bank akan dinyatakan <em>Pailit</em>. Warga terakhir yang bertahan dinobatkan sebagai <strong>Sultan Tunggal Warga62</strong>.
               </li>
               <li>
                 <strong>Target Taipan Sultan (Rp 100.000.000)</strong>: Warga pertama yang berhasil mencetak Kekayaan Bersih (Kas + Seluruh Properti) mencapai <strong>Rp 100 Juta</strong> langsung dinobatkan sebagai pemenang tanpa menunggu lawan bangkrut!

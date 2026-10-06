@@ -22,6 +22,8 @@ interface PlayerHUDProps {
   onOpenTileClick: (tile: BoardTile) => void;
   onOpenKarmaInfo: (player: Player) => void;
   isRolling: boolean;
+  isOnlineMode?: boolean;
+  isMyTurnOnline?: boolean;
 }
 
 export const PlayerHUD: React.FC<PlayerHUDProps> = ({
@@ -40,7 +42,9 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
   onOpenTileDetail,
   onOpenTileClick,
   onOpenKarmaInfo,
-  isRolling
+  isRolling,
+  isOnlineMode = false,
+  isMyTurnOnline = true
 }) => {
   const isHighKarma = activePlayer.karma >= 60;
 
@@ -233,7 +237,14 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
           </div>
         ) : (
           /* Normal Action Controls Grid */
-          <div className="grid grid-cols-2 gap-2.5 pt-1">
+          <div className="space-y-2.5 pt-1">
+            {isOnlineMode && !isMyTurnOnline && (
+              <div className="p-2.5 bg-blue-100 border-2 border-blue-400 rounded-xl flex items-center gap-2 text-blue-900 font-bold text-xs animate-pulse">
+                <span className="text-base">⏳</span>
+                <span>Sedang giliran <b>{activePlayer.name}</b>. Menunggu langkah teman...</span>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={onRollDice}
               disabled={!canRoll || isRolling || activePlayer.isBot}
@@ -295,6 +306,7 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               Selesai Giliran
             </button>
+            </div>
           </div>
         )}
       </div>
