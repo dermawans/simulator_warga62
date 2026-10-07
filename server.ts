@@ -57,6 +57,14 @@ async function startServer() {
     });
   });
 
+  // Client config endpoint for Supabase public keys (supports both VITE_ and standard env vars)
+  app.get('/api/config', (req, res) => {
+    res.json({
+      supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+      supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    });
+  });
+
   // Get public room info
   app.get('/api/rooms/:code', (req, res) => {
     const code = req.params.code.toUpperCase();

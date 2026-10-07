@@ -238,3 +238,163 @@
   animation: pulseGlow 1s ease-in-out infinite;
 }
 
+/* --- KARTU NASIB & KESEMPATAN: ANIMASI DITARIK & BERPUTAR 3D --- */
+
+@keyframes cardDrawAndSpin {
+  0% {
+    opacity: 0;
+    transform: perspective(1200px) translateY(260px) translateX(120px) rotate(-28deg) rotateY(180deg) scale(0.45);
+    filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.45));
+  }
+  30% {
+    opacity: 1;
+    transform: perspective(1200px) translateY(-30px) translateX(15px) rotate(8deg) rotateY(270deg) scale(1.08);
+  }
+  65% {
+    transform: perspective(1200px) translateY(10px) translateX(-5px) rotate(-3deg) rotateY(360deg) scale(0.96);
+  }
+  85% {
+    transform: perspective(1200px) translateY(-6px) translateX(0) rotate(1deg) rotateY(360deg) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) translateY(0) translateX(0) rotate(0deg) rotateY(360deg) scale(1);
+    filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.35));
+  }
+}
+
+.animate-card-draw-spin {
+  animation: cardDrawAndSpin 1s cubic-bezier(0.2, 0.9, 0.3, 1.1) forwards;
+  transform-style: preserve-3d;
+}
+
+@keyframes cardInteractiveFlip {
+  0% {
+    transform: perspective(1000px) rotateY(0deg) scale(1);
+  }
+  50% {
+    transform: perspective(1000px) rotateY(180deg) scale(1.06);
+  }
+  100% {
+    transform: perspective(1000px) rotateY(360deg) scale(1);
+  }
+}
+
+.animate-card-flip-360 {
+  animation: cardInteractiveFlip 0.85s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  transform-style: preserve-3d;
+}
+
+@keyframes cardShineSweep {
+  0% {
+    transform: translateX(-150%) skewX(-25deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+.animate-card-shine {
+  animation: cardShineSweep 1.2s ease-in-out 0.4s forwards;
+}
+
+@keyframes deckPulseStack {
+  0%, 100% {
+    transform: translateY(0) rotate(-4deg) scale(0.98);
+  }
+  50% {
+    transform: translateY(-4px) rotate(-6deg) scale(1.01);
+  }
+}
+
+.animate-deck-stack {
+  animation: deckPulseStack 2s ease-in-out infinite;
+}
+
+/* --- DICE 3D TUMBLE, SHAKE & DRAMATIC RESULT REVEAL --- */
+
+@keyframes diceTumble {
+  0% {
+    transform: perspective(600px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) translateY(0) scale(1);
+  }
+  20% {
+    transform: perspective(600px) rotateX(120deg) rotateY(70deg) rotateZ(90deg) translateY(-24px) scale(1.15);
+  }
+  40% {
+    transform: perspective(600px) rotateX(240deg) rotateY(160deg) rotateZ(180deg) translateY(-36px) scale(1.22);
+  }
+  60% {
+    transform: perspective(600px) rotateX(360deg) rotateY(260deg) rotateZ(270deg) translateY(-20px) scale(1.12);
+  }
+  80% {
+    transform: perspective(600px) rotateX(460deg) rotateY(320deg) rotateZ(330deg) translateY(-8px) scale(1.05);
+  }
+  100% {
+    transform: perspective(600px) rotateX(540deg) rotateY(360deg) rotateZ(360deg) translateY(0) scale(1);
+  }
+}
+
+.animate-dice-tumble {
+  animation: diceTumble 0.45s ease-in-out infinite;
+}
+
+@keyframes diceLandImpact {
+  0% {
+    transform: perspective(600px) translateY(-50px) scale(1.3) rotate(-15deg);
+    opacity: 0.8;
+  }
+  45% {
+    transform: perspective(600px) translateY(8px) scaleX(1.15) scaleY(0.85) rotate(4deg);
+    opacity: 1;
+  }
+  70% {
+    transform: perspective(600px) translateY(-10px) scaleX(0.95) scaleY(1.05) rotate(-2deg);
+  }
+  85% {
+    transform: perspective(600px) translateY(2px) scale(1.02) rotate(1deg);
+  }
+  100% {
+    transform: perspective(600px) translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-dice-land {
+  animation: diceLandImpact 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes diceResultPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(20px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-dice-result-pop {
+  animation: diceResultPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes shakerShake {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  20% { transform: rotate(-8deg) translateY(-6px); }
+  40% { transform: rotate(8deg) translateY(-2px); }
+  60% { transform: rotate(-6deg) translateY(-8px); }
+  80% { transform: rotate(6deg) translateY(-4px); }
+}
+
+.animate-shaker-shake {
+  animation: shakerShake 0.35s ease-in-out infinite;
+}
+

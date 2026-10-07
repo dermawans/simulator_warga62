@@ -16,15 +16,55 @@ export interface GameSaveData {
 
 const LOCAL_STORAGE_SAVES_KEY = 'warga62_local_saves_v1';
 
-// Read configuration strictly from Vite environment variables (no credentials exposed in UI)
-const envUrl = ((import.meta as any).env?.VITE_SUPABASE_URL || '').trim();
-const envKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
+// Read configuration from Vite environment variables (supports VITE_SUPABASE_URL, SUPABASE_URL, or /api/config)
+let envUrl = ((import.meta as any).env?.VITE_SUPABASE_URL || '').trim();
+let envKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
 
 let cachedClient: SupabaseClient | null = null;
+let configFetchPromise: Promise<void> | null = null;
+
+export async function ensureConfigLoaded(): Promise<void> {
+  if (envUrl && envKey) {
+    if (!cachedClient) {
+      try {
+        cachedClient = createClient(envUrl, envKey);
+      } catch (err) {
+        console.error('Failed to initialize Supabase client:', err);
+      }
+    }
+    return;
+  }
+
+  if (!configFetchPromise) {
+    configFetchPromise = fetch('/api/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.supabaseUrl && data?.supabaseAnonKey) {
+          envUrl = data.supabaseUrl.trim();
+          envKey = data.supabaseAnonKey.trim();
+          if (envUrl && envKey) {
+            cachedClient = createClient(envUrl, envKey);
+          }
+        }
+      })
+      .catch(() => {});
+  }
+  await configFetchPromise;
+}
+
+// Initial attempt to create client
+if (envUrl && envKey) {
+  try {
+    cachedClient = createClient(envUrl, envKey);
+  } catch {}
+}
 
 export function getSupabaseClient(): SupabaseClient | null {
-  if (!envUrl || !envKey) return null;
   if (cachedClient) return cachedClient;
+  if (!envUrl || !envKey) {
+    ensureConfigLoaded();
+    return null;
+  }
 
   try {
     cachedClient = createClient(envUrl, envKey);
@@ -44,6 +84,7 @@ export async function saveGameToCloud(
   saveCode: string,
   data: Omit<GameSaveData, 'save_code' | 'saved_at'>
 ): Promise<{ success: boolean; cloudSaved: boolean; message: string }> {
+  await ensureConfigLoaded();
   const cleanCode = saveCode.trim().toUpperCase();
   const timestamp = new Date().toISOString();
 
@@ -105,6 +146,7 @@ export async function saveGameToCloud(
 export async function loadGameFromCloud(
   saveCode: string
 ): Promise<{ success: boolean; data?: GameSaveData; message: string }> {
+  await ensureConfigLoaded();
   const cleanCode = saveCode.trim().toUpperCase();
 
   // 1. Try Supabase Cloud first if client exists

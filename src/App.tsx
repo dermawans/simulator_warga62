@@ -43,6 +43,7 @@ import { OnlineLobbyModal } from './components/OnlineLobbyModal';
 import { OnlineChatDrawer } from './components/OnlineChatDrawer';
 import { multiplayerService } from './services/multiplayer';
 import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
+import { DiceRollOverlay, DiceOverlayState } from './components/DiceRollOverlay';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -60,6 +61,7 @@ export default function App() {
   const [onlineLobbyOpen, setOnlineLobbyOpen] = useState(false);
   const [multiplayerRoom, setMultiplayerRoom] = useState<RoomState | null>(null);
   const [onlineChatMessages, setOnlineChatMessages] = useState<ChatMessage[]>([]);
+  const [diceOverlayState, setDiceOverlayState] = useState<DiceOverlayState | null>(null);
   const [liquidatingPropsModal, setLiquidatingPropsModal] = useState<{
     playerName: string;
     playerAvatar: string;
@@ -311,12 +313,51 @@ export default function App() {
   useEffect(() => {
     const unsubAction = multiplayerService.onGameAction((action, senderId) => {
       switch (action.type) {
-        case 'ROLL_DICE':
+        case 'ROLL_DICE': {
           soundManager.playDiceRoll();
-          setDiceRoll(action.dice);
-          setHasRolled(true);
-          movePlayer(action.steps);
+          const validDice: [number, number] =
+            Array.isArray(action.dice) &&
+            typeof action.dice[0] === 'number' &&
+            !isNaN(action.dice[0]) &&
+            typeof action.dice[1] === 'number' &&
+            !isNaN(action.dice[1])
+              ? [action.dice[0], action.dice[1]]
+              : [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
+          const validSteps =
+            typeof action.steps === 'number' && !isNaN(action.steps) && action.steps > 0
+              ? action.steps
+              : validDice[0] + validDice[1];
+
+          const roller = players.find((p) => p.id === senderId) || activePlayer;
+          setIsRolling(true);
+          setDiceOverlayState({
+            isOpen: true,
+            isRolling: true,
+            dice: [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1],
+            player: roller,
+            totalSteps: validSteps,
+          });
+
+          setTimeout(() => {
+            setDiceRoll(validDice);
+            soundManager.playDiceLand();
+            setDiceOverlayState({
+              isOpen: true,
+              isRolling: false,
+              dice: validDice,
+              player: roller,
+              totalSteps: validSteps,
+            });
+
+            setTimeout(() => {
+              setDiceOverlayState(null);
+              setIsRolling(false);
+              setHasRolled(true);
+              movePlayer(validSteps);
+            }, 1000);
+          }, 650);
           break;
+        }
 
         case 'BUY_PROPERTY': {
           soundManager.playMoney();
@@ -500,36 +541,71 @@ export default function App() {
   };
 
   // Roll Dice & Move
-  const handleRollDice = (customRoll?: [number, number]) => {
+  const handleRollDice = (customRoll?: any) => {
     if (isRolling || hasRolled || isHopping || !activePlayer) return;
 
     setIsRolling(true);
     soundManager.playDiceRoll();
 
+    // Verify if customRoll is truly a valid [number, number] tuple and not a React event object
+    const isCustom =
+      Array.isArray(customRoll) &&
+      typeof customRoll[0] === 'number' &&
+      !isNaN(customRoll[0]) &&
+      typeof customRoll[1] === 'number' &&
+      !isNaN(customRoll[1]);
+
+    const d1 = isCustom ? customRoll[0] : Math.floor(Math.random() * 6) + 1;
+    const d2 = isCustom ? customRoll[1] : Math.floor(Math.random() * 6) + 1;
+    const totalSteps = d1 + d2;
+
+    // Phase 1: Show rolling shaker/tumbling modal
+    setDiceOverlayState({
+      isOpen: true,
+      isRolling: true,
+      dice: [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1],
+      player: activePlayer,
+      totalSteps,
+    });
+
+    // Broadcast to other players if in online room
+    if (multiplayerRoom && !isCustom) {
+      multiplayerService.sendAction({
+        type: 'ROLL_DICE',
+        dice: [d1, d2],
+        steps: totalSteps,
+      });
+    }
+
+    // Roll duration: 700ms
     setTimeout(() => {
-      const d1 = customRoll ? customRoll[0] : Math.floor(Math.random() * 6) + 1;
-      const d2 = customRoll ? customRoll[1] : Math.floor(Math.random() * 6) + 1;
-      const totalSteps = d1 + d2;
-
+      // Phase 2: Reveal landed result with audio clack & chime
       setDiceRoll([d1, d2]);
-      setIsRolling(false);
-      setHasRolled(true);
+      soundManager.playDiceLand();
+      setDiceOverlayState({
+        isOpen: true,
+        isRolling: false,
+        dice: [d1, d2],
+        player: activePlayer,
+        totalSteps,
+      });
 
-      // Broadcast to other players if in online room
-      if (multiplayerRoom && !customRoll) {
-        multiplayerService.sendAction({
-          type: 'ROLL_DICE',
-          dice: [d1, d2],
-          steps: totalSteps,
-        });
-      }
-
-      movePlayer(totalSteps);
-    }, 600);
+      // Display result clearly for 1100ms before starting to move
+      setTimeout(() => {
+        setDiceOverlayState(null);
+        setIsRolling(false);
+        setHasRolled(true);
+        movePlayer(totalSteps);
+      }, 1100);
+    }, 700);
   };
 
   const movePlayer = (steps: number) => {
     if (!activePlayer) return;
+
+    // Safety fallback: ensure steps is always a positive integer
+    const safeSteps =
+      typeof steps === 'number' && !isNaN(steps) && steps > 0 ? Math.round(steps) : 2;
 
     setIsHopping(true);
     setHoppingPlayerId(activePlayer.id);
@@ -593,7 +669,7 @@ export default function App() {
       });
 
       // Destination reached
-      if (currentStep >= steps) {
+      if (currentStep >= safeSteps) {
         window.clearInterval(stepInterval);
 
         setTimeout(() => {
@@ -1372,7 +1448,8 @@ export default function App() {
                   economic={currentEconomic}
                   arisanPot={arisanPot}
                   diceRoll={diceRoll}
-                  isRolling={isRolling || isHopping}
+                  isRolling={isRolling}
+                  isHopping={isHopping}
                   onTileClick={(tile) => setInspectedTile(tile)}
                   recentLog={recentLog}
                   hoppingPlayerId={hoppingPlayerId}
@@ -1404,7 +1481,7 @@ export default function App() {
                     currentTile.houses < 3 &&
                     !isHopping
                   }
-                  onRollDice={handleRollDice}
+                  onRollDice={() => handleRollDice()}
                   onEndTurn={handleEndTurn}
                   onBuyProperty={handleBuyProperty}
                   onOpenCorruption={() => setCorruptionModalOpen(true)}
@@ -1413,7 +1490,9 @@ export default function App() {
                   onOpenTileDetail={() => setInspectedTile(currentTile)}
                   onOpenTileClick={(t) => setInspectedTile(t)}
                   onOpenKarmaInfo={(p) => setKarmaModalPlayer(p)}
-                  isRolling={isRolling || isHopping}
+                  isRolling={isRolling}
+                  isHopping={isHopping}
+                  diceRoll={diceRoll}
                 />
               </div>
             </div>
@@ -1598,6 +1677,9 @@ export default function App() {
           currentUserColor={activePlayer?.color || '#0284c7'}
         />
       )}
+
+      {/* 16. Dynamic 3D Dice Roll & Reveal Overlay */}
+      <DiceRollOverlay state={diceOverlayState} />
     </div>
   );
 }

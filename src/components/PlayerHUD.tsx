@@ -22,6 +22,8 @@ interface PlayerHUDProps {
   onOpenTileClick: (tile: BoardTile) => void;
   onOpenKarmaInfo: (player: Player) => void;
   isRolling: boolean;
+  isHopping?: boolean;
+  diceRoll?: [number, number];
   isOnlineMode?: boolean;
   isMyTurnOnline?: boolean;
 }
@@ -43,6 +45,8 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
   onOpenTileClick,
   onOpenKarmaInfo,
   isRolling,
+  isHopping = false,
+  diceRoll,
   isOnlineMode = false,
   isMyTurnOnline = true
 }) => {
@@ -246,7 +250,7 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
             )}
             <div className="grid grid-cols-2 gap-2.5">
             <button
-              onClick={onRollDice}
+              onClick={() => onRollDice()}
               disabled={!canRoll || isRolling || activePlayer.isBot}
               className={`py-3 px-3 rounded-xl font-black text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer ${
                 canRoll && !isRolling && !activePlayer.isBot
@@ -254,8 +258,12 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <Dices className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
-              {isRolling ? 'Melompat...' : 'Kocok Dadu!'}
+              <Dices className={`w-4 h-4 ${isRolling ? 'animate-spin text-amber-950' : ''}`} />
+              {isRolling
+                ? 'Mengocok Dadu...'
+                : isHopping && diceRoll
+                ? `Maju ${diceRoll[0] + diceRoll[1]} Petak!`
+                : 'Kocok Dadu!'}
             </button>
 
             {/* Buy Property or Corruption Button */}

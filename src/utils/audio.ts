@@ -66,16 +66,16 @@ class SoundManager {
     this.initContext();
     if (!this.ctx) return;
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       setTimeout(() => {
         if (!this.ctx || this.isMuted) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(220 + Math.random() * 200, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(240 + Math.random() * 220, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.08);
 
-        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.22, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
 
         osc.connect(gain);
@@ -83,8 +83,55 @@ class SoundManager {
 
         osc.start();
         osc.stop(this.ctx.currentTime + 0.08);
-      }, i * 60);
+      }, i * 55);
     }
+  }
+
+  public playDiceLand() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    // Satisfying double-thud impact on felt/wood plus high sparkle
+    const now = this.ctx.currentTime;
+    
+    // Impact 1 (first die landing)
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(180, now);
+    osc1.frequency.exponentialRampToValueAtTime(55, now + 0.09);
+    gain1.gain.setValueAtTime(0.35, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.1);
+
+    // Impact 2 (second die landing slightly after)
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(220, now + 0.06);
+    osc2.frequency.exponentialRampToValueAtTime(65, now + 0.16);
+    gain2.gain.setValueAtTime(0.3, now + 0.06);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.06);
+    osc2.stop(now + 0.18);
+
+    // Ding chime on final result
+    const chime = this.ctx.createOscillator();
+    const chimeGain = this.ctx.createGain();
+    chime.type = 'sine';
+    chime.frequency.setValueAtTime(1046.5, now + 0.08); // C6
+    chimeGain.gain.setValueAtTime(0.18, now + 0.08);
+    chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    chime.connect(chimeGain);
+    chimeGain.connect(this.ctx.destination);
+    chime.start(now + 0.08);
+    chime.stop(now + 0.35);
   }
 
   public playMoney() {
@@ -349,6 +396,98 @@ class SoundManager {
   public playBurn() {
     this.playRoaringFire();
     this.playBurningPaper();
+  }
+
+  // Efek Suara Kartu Ditarik (Card Draw slide & friction)
+  public playCardDraw() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // White noise buffer for card friction
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(900, now);
+      filter.frequency.exponentialRampToValueAtTime(3200, now + 0.15);
+      filter.Q.setValueAtTime(2.2, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.24, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      noise.start(now);
+      noise.stop(now + 0.18);
+    } catch {
+      // AudioContext fallback
+    }
+  }
+
+  // Efek Suara Kartu Berputar & Reveal (3D Card Spin & Shimmer Chime)
+  public playCardSpin() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+
+      // 1. Modulated whoosh for the spinning motion
+      const whooshOsc = this.ctx.createOscillator();
+      const whooshGain = this.ctx.createGain();
+      whooshOsc.type = 'sine';
+      whooshOsc.frequency.setValueAtTime(280, now);
+      whooshOsc.frequency.exponentialRampToValueAtTime(680, now + 0.14);
+      whooshOsc.frequency.exponentialRampToValueAtTime(340, now + 0.32);
+
+      whooshGain.gain.setValueAtTime(0.02, now);
+      whooshGain.gain.linearRampToValueAtTime(0.18, now + 0.12);
+      whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+
+      whooshOsc.connect(whooshGain);
+      whooshGain.connect(this.ctx.destination);
+
+      whooshOsc.start(now);
+      whooshOsc.stop(now + 0.34);
+
+      // 2. High sparkle chime when the card settles
+      const chimes = [1318.51, 1661.22, 1975.53, 2637.02]; // E6, G#6, B6, E7
+      chimes.forEach((freq, idx) => {
+        setTimeout(() => {
+          if (!this.ctx || this.isMuted) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.28);
+        }, 160 + idx * 45);
+      });
+    } catch {
+      // AudioContext fallback
+    }
   }
 
   public playCrash() {

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BoardTile, Player, EconomicCondition } from '../types/game';
 import { formatShortRupiah } from '../utils/formatters';
 import { UPGRADE_TIERS } from '../data/boardTiles';
 import simulatorWniBanner from '../assets/images/simulator_wni_banner_1791190534170.jpg';
+import { DiceFace } from './DiceRollOverlay';
 
 export interface StartBonusNotification {
   id: number;
@@ -21,6 +22,7 @@ interface GameBoardProps {
   arisanPot: number;
   diceRoll: [number, number];
   isRolling: boolean;
+  isHopping?: boolean;
   onTileClick: (tile: BoardTile) => void;
   recentLog: string;
   hoppingPlayerId?: string | null;
@@ -66,6 +68,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   arisanPot,
   diceRoll,
   isRolling,
+  isHopping = false,
   onTileClick,
   recentLog,
   hoppingPlayerId,
@@ -73,6 +76,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   liquidatingTileIds = [],
   startBonusNotification = null
 }) => {
+  const [shufflingDice, setShufflingDice] = useState<[number, number]>([
+    diceRoll?.[0] || 1,
+    diceRoll?.[1] || 1,
+  ]);
+
+  useEffect(() => {
+    if (!isRolling) {
+      setShufflingDice([
+        typeof diceRoll?.[0] === 'number' && !isNaN(diceRoll[0]) ? diceRoll[0] : 1,
+        typeof diceRoll?.[1] === 'number' && !isNaN(diceRoll[1]) ? diceRoll[1] : 1,
+      ]);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setShufflingDice([
+        Math.floor(Math.random() * 6) + 1,
+        Math.floor(Math.random() * 6) + 1,
+      ]);
+    }, 60);
+
+    return () => clearInterval(interval);
+  }, [isRolling, diceRoll]);
+
   return (
     <div className="relative w-full max-w-[960px] aspect-square mx-auto p-1.5 sm:p-3 bg-[#e2d5b5] rounded-3xl comic-box-lg select-none shadow-2xl">
       {/* Floating START Bonus Popup (Meluncur ke Atas) */}
@@ -284,25 +311,50 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </div>
 
             {/* 3D-styled Dice */}
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-9 h-9 sm:w-11 sm:h-11 bg-white border-2 border-slate-900 rounded-xl flex items-center justify-center text-base sm:text-xl font-black font-mono shadow-sm ${
-                  isRolling ? 'animate-dice bg-amber-100 text-amber-900' : 'text-slate-900'
-                }`}
-              >
-                {diceRoll[0]}
-              </div>
-              <div
-                className={`w-9 h-9 sm:w-11 sm:h-11 bg-white border-2 border-slate-900 rounded-xl flex items-center justify-center text-base sm:text-xl font-black font-mono shadow-sm ${
-                  isRolling ? 'animate-dice bg-amber-100 text-amber-900' : 'text-slate-900'
-                }`}
-              >
-                {diceRoll[1]}
-              </div>
-              <span className="text-xs sm:text-sm font-black font-comic text-slate-700 ml-1">
-                = {diceRoll[0] + diceRoll[1]}
-              </span>
-            </div>
+            {(() => {
+              const val1 = isRolling
+                ? shufflingDice[0]
+                : typeof diceRoll?.[0] === 'number' && !isNaN(diceRoll[0])
+                ? diceRoll[0]
+                : 1;
+
+              const val2 = isRolling
+                ? shufflingDice[1]
+                : typeof diceRoll?.[1] === 'number' && !isNaN(diceRoll[1])
+                ? diceRoll[1]
+                : 1;
+
+              const sum = val1 + val2;
+
+              return (
+                <div className="flex items-center gap-2">
+                  <div className={isRolling ? 'animate-dice-tumble' : ''}>
+                    <DiceFace value={val1} size="sm" isRolling={isRolling} />
+                  </div>
+                  <div className={isRolling ? 'animate-dice-tumble' : ''}>
+                    <DiceFace value={val2} size="sm" isRolling={isRolling} />
+                  </div>
+                  <div className="flex flex-col ml-1 min-w-[80px]">
+                    <span className="text-xs sm:text-sm font-black font-comic text-slate-900 leading-tight">
+                      {isRolling ? `${val1} + ${val2}` : `= ${sum}`}
+                    </span>
+                    {isRolling ? (
+                      <span className="text-[9px] font-bold font-comic text-amber-700 animate-pulse">
+                        Mengocok...
+                      </span>
+                    ) : isHopping ? (
+                      <span className="text-[9px] font-black font-comic text-emerald-800 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-300 animate-pulse whitespace-nowrap">
+                        Maju {sum} Petak!
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold font-mono text-slate-500">
+                        {val1} + {val2}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
