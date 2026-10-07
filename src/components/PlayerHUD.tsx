@@ -264,7 +264,7 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
                     <KeyRound className="w-4 h-4" />
                     {canAffordBail
                       ? (activePlayer.characterId === 'pengacara_sultan'
-                          ? `⚖️ Suap Sipir Hotman Paris (${formatRupiah(bailCost)})`
+                          ? `⚖️ Suap Sipir Hotmam (${formatRupiah(bailCost)})`
                           : `Suap Sipir Bebas Instan (${formatRupiah(bailCost)})`)
                       : `Suap Sipir (Perlu ${formatRupiah(bailCost)} - Saldo Kurang)`}
                   </button>

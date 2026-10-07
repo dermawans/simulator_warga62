@@ -102,7 +102,7 @@ export const CHARACTER_PRESETS: CharacterPreset[] = [
   },
   {
     id: 'ustadz_kondang',
-    name: 'Habib Jafar Santuy',
+    name: 'Habib Fajar Santuy',
     role: 'Pendakwah & Tokoh Panutan',
     title: 'Duta Sedekah & Pembersih Dosa',
     perkDescription: 'Bersedekah memotong Karma KPK 2x lebih banyak (-30%), dan risiko OTT KPK berkurang.',
@@ -113,7 +113,7 @@ export const CHARACTER_PRESETS: CharacterPreset[] = [
   },
   {
     id: 'menteri_segala_urusan',
-    name: 'Lord Luhut Eksekutor',
+    name: 'Lord Lutuh Eksekutor',
     role: 'Menteri Segala Urusan',
     title: 'Ketua Satgas Proyek Strategis',
     perkDescription: 'Diskon 20% saat membeli kavling properti baru atau aset BUMN.',
@@ -135,7 +135,7 @@ export const CHARACTER_PRESETS: CharacterPreset[] = [
   },
   {
     id: 'pengacara_sultan',
-    name: 'Bang Hotman 30M',
+    name: 'Bang Hotmam 30M',
     role: 'Pengacara Konglomerat',
     title: 'Pakar Hukum Kasus Viral',
     perkDescription: 'Biaya suap sipir Sukamiskin diskon 50% (cukup Rp 1.250.000) dan bebas langsung.',
@@ -157,7 +157,7 @@ export const CHARACTER_PRESETS: CharacterPreset[] = [
   },
   {
     id: 'tuan_tanah_betawi',
-    name: 'Haji Lulung Kontrakan',
+    name: 'Haji LInglung Kontrakan',
     role: 'Tuan Tanah Betawi',
     title: 'Juragan Kontrakan 100 Pintu',
     perkDescription: 'Menerima tambahan sewa +15% pada seluruh properti miliknya yang sudah di-upgrade.',

@@ -1767,7 +1767,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-300 bg-amber-100/50 py-3 px-4 text-center text-xs text-slate-600 font-medium flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-        <span>Simulator Warga62 © 2026 · Game Monopoli Satir Kehidupan Nyata Indonesia</span>
+        <span>Simulator Warga62 © 2026 · Game Monopoli</span>
         <button
           onClick={() => setFeedbackModalOpen(true)}
           className="text-amber-900 font-bold hover:text-red-700 underline flex items-center gap-1 cursor-pointer transition-colors"

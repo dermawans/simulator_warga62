@@ -244,7 +244,7 @@ export const SABOTAGE_SKILLS: SabotageSkill[] = [
 export const DEFAULT_LEADERBOARD = [
   {
     id: 'lead_1',
-    name: 'Haji Lulung Kw Super',
+    name: 'Haji Linglung Kw Super',
     role: 'Penguasa Lapak Pasar',
     characterEmoji: '🧔🏻‍♂️',
     netWorth: 285000000,
