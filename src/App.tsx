@@ -43,6 +43,7 @@ import { OnlineLobbyModal } from './components/OnlineLobbyModal';
 import { OnlineChatDrawer } from './components/OnlineChatDrawer';
 import { multiplayerService } from './services/multiplayer';
 import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -943,7 +944,7 @@ export default function App() {
         return next;
       });
 
-      setRecentLog(`🚨 OTT KPK! ${activePlayer.name} tertangkap tangan korupsi ${scheme.name}!`);
+      setRecentLog(`��� OTT KPK! ${activePlayer.name} tertangkap tangan korupsi ${scheme.name}!`);
 
       setViralNews({
         player: activePlayer,
@@ -1598,6 +1599,9 @@ export default function App() {
           currentUserColor={activePlayer?.color || '#0284c7'}
         />
       )}
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
