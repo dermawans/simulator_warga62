@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { multiplayerService } from '../services/multiplayer';
 import { RoomState, RoomPlayer } from '../types/multiplayer';
 import { CHARACTER_PRESETS } from '../data/characters';
@@ -53,12 +53,17 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
   // Quick Lobby Chat
   const [chatInput, setChatInput] = useState('');
   const [lobbyChat, setLobbyChat] = useState<{ sender: string; text: string; color: string }[]>([]);
+  const connectTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
     // Subscribe to multiplayer service events
     const unsubRoom = multiplayerService.onRoomUpdate((room) => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       setCurrentRoom(room);
       setViewState('LOBBY');
       setIsConnecting(false);
@@ -72,6 +77,10 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     });
 
     const unsubError = multiplayerService.onError((msg) => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       setErrorMessage(msg);
       setIsConnecting(false);
       soundManager.playGavel();
@@ -86,6 +95,10 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     });
 
     return () => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       unsubRoom();
       unsubStart();
       unsubError();
@@ -112,6 +125,12 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     setIsConnecting(true);
     setErrorMessage(null);
 
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = window.setTimeout(() => {
+      setIsConnecting(false);
+      setErrorMessage('Waktu koneksi habis. Server WebSocket/Supabase belum merespons. Anda dapat mencoba "Mode Lobi Simulasi" di bawah.');
+    }, 7000);
+
     const newCode = generateRandomRoomCode();
     const myPlayer: RoomPlayer = {
       id: `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -128,11 +147,43 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     multiplayerService.joinRoom(newCode, myPlayer, maxPlayers);
   };
 
+  // Create Simulation Room (instant local test)
+  const handleCreateSimulationRoom = () => {
+    if (!playerName.trim()) return;
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+    setIsConnecting(false);
+    setErrorMessage(null);
+
+    const newCode = generateRandomRoomCode();
+    const myPlayer: RoomPlayer = {
+      id: `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: playerName.trim(),
+      avatarEmoji: activePreset.avatarEmoji,
+      color: selectedColor,
+      accessory: activePreset.accessory,
+      quote: activePreset.quote,
+      isHost: true,
+      isReady: true,
+      connected: true,
+    };
+
+    multiplayerService.initSimulationRoom(newCode, myPlayer, maxPlayers);
+  };
+
   // Join Room
   const handleJoinRoom = () => {
     if (!playerName.trim() || !roomCodeInput.trim()) return;
     setIsConnecting(true);
     setErrorMessage(null);
+
+    if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+    connectTimeoutRef.current = window.setTimeout(() => {
+      setIsConnecting(false);
+      setErrorMessage('Waktu koneksi habis saat mencari room. Pastikan kode room sudah benar.');
+    }, 7000);
 
     const cleanCode = roomCodeInput.trim().toUpperCase();
     const myPlayer: RoomPlayer = {
@@ -378,6 +429,17 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
                       </>
                     )}
                   </button>
+
+                  <div className="pt-1 flex items-center justify-between text-[11px] text-slate-600 font-bold">
+                    <span>Atau tes lobi tanpa internet:</span>
+                    <button
+                      type="button"
+                      onClick={handleCreateSimulationRoom}
+                      className="text-blue-700 hover:text-blue-900 underline flex items-center gap-1 cursor-pointer font-black"
+                    >
+                      🎮 Coba Mode Simulasi Lobi →
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -417,11 +479,21 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
                 </div>
               )}
 
-              {/* Error Message */}
+              {/* Error Message with Quick Action */}
               {errorMessage && (
-                <div className="p-3 rounded-xl border-2 border-slate-900 bg-rose-100 text-rose-900 flex items-center gap-2 font-bold text-[11px]">
-                  <X className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{errorMessage}</span>
+                <div className="p-3.5 rounded-2xl border-2 border-slate-900 bg-rose-100 text-rose-950 flex flex-col gap-2 font-bold text-xs shadow-xs">
+                  <div className="flex items-start gap-2">
+                    <X className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{errorMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateSimulationRoom}
+                    className="self-end px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-[11px] font-black font-comic cursor-pointer shadow-2xs flex items-center gap-1"
+                  >
+                    <span>Coba Mode Simulasi Lobi (Langsung Masuk)</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )}
             </div>
@@ -433,9 +505,16 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
               {/* Room Code Card */}
               <div className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 p-4 rounded-2xl border-3 border-slate-900 comic-box-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-950">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-slate-950 text-yellow-300 px-2 py-0.5 rounded-md">
-                    Kode Room Mabar
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-slate-950 text-yellow-300 px-2 py-0.5 rounded-md">
+                      Kode Room Mabar
+                    </span>
+                    {multiplayerService.getIsSimulationMode() && (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-700 text-white px-2 py-0.5 rounded-md">
+                        Mode Simulasi Lobi
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-widest mt-1">
                     {currentRoom.code}
                   </h3>
