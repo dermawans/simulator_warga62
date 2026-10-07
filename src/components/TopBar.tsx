@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Trophy, BookOpen, RotateCcw, Cloud, Globe } from 'lucide-react';
+import { Volume2, VolumeX, Trophy, BookOpen, RotateCcw, Cloud, Globe, MessageSquarePlus } from 'lucide-react';
 
 interface TopBarProps {
   isMuted: boolean;
@@ -8,6 +8,7 @@ interface TopBarProps {
   onOpenRules: () => void;
   onOpenSaveLoad: () => void;
   onOpenMultiplayer?: () => void;
+  onOpenFeedback?: () => void;
   multiplayerRoomCode?: string | null;
   onResetGame: () => void;
   inGame: boolean;
@@ -20,6 +21,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenRules,
   onOpenSaveLoad,
   onOpenMultiplayer,
+  onOpenFeedback,
   multiplayerRoomCode,
   onResetGame,
   inGame
@@ -75,6 +77,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           <BookOpen className="w-4 h-4" />
           Tata Tertib
         </button>
+        {onOpenFeedback && (
+          <button
+            onClick={onOpenFeedback}
+            className="flex items-center gap-1.5 text-slate-800 hover:text-slate-950 transition-colors whitespace-nowrap cursor-pointer px-2.5 py-1 bg-amber-200/80 hover:bg-amber-300 rounded-xl border border-slate-900/60 shadow-2xs"
+            title="Lapor Bug & Kotak Saran Warga"
+          >
+            <MessageSquarePlus className="w-4 h-4 text-rose-600" />
+            <span>Lapor / Saran</span>
+          </button>
+        )}
         {inGame && (
           <button
             onClick={onResetGame}
@@ -96,6 +108,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <Globe className="w-4 h-4 text-yellow-300 animate-spin-slow" />
             <span>Mabar</span>
+          </button>
+        )}
+
+        {onOpenFeedback && (
+          <button
+            onClick={onOpenFeedback}
+            className="md:hidden p-2 rounded-xl bg-amber-200 border-2 border-slate-900 text-slate-900 cursor-pointer"
+            title="Lapor Bug & Usulan Fitur"
+          >
+            <MessageSquarePlus className="w-4 h-4 text-rose-600" />
           </button>
         )}
 

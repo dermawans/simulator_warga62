@@ -65,6 +65,49 @@ async function startServer() {
     });
   });
 
+  // Citizen Feedback & Bug Report storage
+  const feedbackStore: Array<{
+    id: string;
+    type: string;
+    title: string;
+    category: string;
+    description: string;
+    senderName: string;
+    priority: string;
+    deviceInfo?: string;
+    createdAt: string;
+  }> = [];
+
+  app.post('/api/feedback', express.json(), (req, res) => {
+    try {
+      const { id, type, title, category, description, senderName, priority, deviceInfo, createdAt } = req.body || {};
+      if (!title || !description) {
+        return res.status(400).json({ error: 'Judul dan deskripsi wajib diisi' });
+      }
+      const entry = {
+        id: id || `fb_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        type: type === 'FEATURE' ? 'FEATURE' : 'BUG',
+        title: String(title).slice(0, 150),
+        category: category || 'Lainnya',
+        description: String(description).slice(0, 2500),
+        senderName: senderName ? String(senderName).slice(0, 50) : 'Warga Anonim',
+        priority: priority === 'HIGH' ? 'HIGH' : priority === 'LOW' ? 'LOW' : 'NORMAL',
+        deviceInfo: deviceInfo ? String(deviceInfo).slice(0, 600) : undefined,
+        createdAt: createdAt || new Date().toISOString(),
+      };
+      feedbackStore.unshift(entry);
+      if (feedbackStore.length > 150) feedbackStore.pop();
+      console.log(`[Feedback] Received ${entry.type} report: "${entry.title}" from ${entry.senderName}`);
+      res.json({ success: true, report: entry });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Gagal mencatat feedback' });
+    }
+  });
+
+  app.get('/api/feedback', (req, res) => {
+    res.json({ reports: feedbackStore });
+  });
+
   // Get public room info
   app.get('/api/rooms/:code', (req, res) => {
     const code = req.params.code.toUpperCase();

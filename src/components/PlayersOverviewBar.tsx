@@ -8,19 +8,22 @@ interface PlayersOverviewBarProps {
   activePlayer: Player;
   tiles: BoardTile[];
   onOpenKarmaInfo: (player: Player) => void;
+  myOnlinePlayerId?: string | null;
 }
 
 export const PlayersOverviewBar: React.FC<PlayersOverviewBarProps> = ({
   players,
   activePlayer,
   tiles,
-  onOpenKarmaInfo
+  onOpenKarmaInfo,
+  myOnlinePlayerId
 }) => {
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {players.map((p) => {
           const isActive = p.id === activePlayer.id;
+          const isMe = !!(myOnlinePlayerId && p.id === myOnlinePlayerId);
           const isHighKarma = p.karma >= 60;
           const ownedPropsCount = tiles.filter((t) => t.ownerId === p.id).length;
 
@@ -30,13 +33,15 @@ export const PlayersOverviewBar: React.FC<PlayersOverviewBarProps> = ({
               className={`p-3.5 rounded-2xl border-2 transition-all relative overflow-hidden flex flex-col justify-between ${
                 isActive
                   ? 'bg-amber-100 border-slate-900 shadow-md ring-2 ring-amber-400'
+                  : isMe
+                  ? 'bg-blue-50/90 border-blue-400 shadow-xs ring-1 ring-blue-300'
                   : 'bg-white/95 border-slate-300 shadow-xs'
               } ${p.isBankrupt ? 'opacity-40 grayscale' : ''}`}
             >
               {/* Active ribbon */}
               {isActive && (
-                <div className="absolute top-0 right-0 bg-slate-900 text-yellow-300 text-[10px] font-bold px-2.5 py-0.5 rounded-bl-lg font-comic uppercase tracking-wider">
-                  Giliran
+                <div className="absolute top-0 right-0 bg-slate-900 text-yellow-300 text-[10px] font-bold px-2.5 py-0.5 rounded-bl-lg font-comic uppercase tracking-wider shadow-xs">
+                  {isMe ? 'Giliran Anda!' : 'Giliran'}
                 </div>
               )}
 
@@ -53,6 +58,11 @@ export const PlayersOverviewBar: React.FC<PlayersOverviewBarProps> = ({
                     <p className="text-xs sm:text-sm font-bold text-slate-900 font-comic leading-tight">
                       {p.name}
                     </p>
+                    {isMe && (
+                      <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-mono font-bold">
+                        ANDA
+                      </span>
+                    )}
                     {p.isBot && (
                       <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded font-mono">
                         Bot

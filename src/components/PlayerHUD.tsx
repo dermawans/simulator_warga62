@@ -26,9 +26,11 @@ interface PlayerHUDProps {
   diceRoll?: [number, number];
   isOnlineMode?: boolean;
   isMyTurnOnline?: boolean;
+  myOnlinePlayer?: Player | null;
 }
 
 export const PlayerHUD: React.FC<PlayerHUDProps> = ({
+  players,
   activePlayer,
   tiles,
   currentTile,
@@ -48,9 +50,11 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
   isHopping = false,
   diceRoll,
   isOnlineMode = false,
-  isMyTurnOnline = true
+  isMyTurnOnline = true,
+  myOnlinePlayer = null,
 }) => {
   const isHighKarma = activePlayer.karma >= 60;
+  const isMyTurn = !isOnlineMode || isMyTurnOnline;
 
   return (
     <div className="w-full space-y-4">
@@ -70,6 +74,17 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
                 <span className="text-[10px] bg-slate-900 text-yellow-300 font-bold px-2 py-0.5 rounded font-comic uppercase tracking-wider">
                   Giliran Aktif
                 </span>
+                {isOnlineMode && (
+                  isMyTurnOnline ? (
+                    <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded font-mono shadow-xs">
+                      ANDA
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded font-mono shadow-xs">
+                      TEMAN
+                    </span>
+                  )
+                )}
                 {activePlayer.isBot && (
                   <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
                     AI Bot
@@ -212,25 +227,35 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-300 leading-snug">
-              Anda mendekam di Lapas Sukamiskin. Anda dapat menjalani masa hukuman giliran demi giliran atau menyuap sipir untuk bebas langsung.
+              {isOnlineMode && !isMyTurnOnline
+                ? `${activePlayer.name} mendekam di Lapas Sukamiskin. Menunggu ${activePlayer.name} menjalani hukuman atau menyuap sipir...`
+                : 'Anda mendekam di Lapas Sukamiskin. Anda dapat menjalani masa hukuman giliran demi giliran atau menyuap sipir untuk bebas langsung.'}
             </p>
 
             <div className="space-y-2 pt-1">
               {/* Primary: Jalani Hukuman */}
               <button
                 onClick={onEndTurn}
-                disabled={activePlayer.isBot}
-                className="w-full py-3 px-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 disabled:opacity-50 text-slate-950 font-black font-comic text-xs uppercase tracking-wider rounded-xl comic-box-sm comic-btn-hover flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                disabled={activePlayer.isBot || !isMyTurn}
+                className={`w-full py-3 px-3 rounded-xl comic-box-sm comic-btn-hover flex items-center justify-center gap-2 font-black font-comic text-xs uppercase tracking-wider ${
+                  !activePlayer.isBot && isMyTurn
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 cursor-pointer shadow-sm'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
               >
                 <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                Jalani Hukuman (-1 Giliran & Lanjut)
+                {!isMyTurn ? `Menunggu ${activePlayer.name} Jalani Hukuman` : 'Jalani Hukuman (-1 Giliran & Lanjut)'}
               </button>
 
               {/* Secondary: Suap Sipir */}
               <button
                 onClick={onPayBail}
-                disabled={activePlayer.money < 2500000 || activePlayer.isBot}
-                className="w-full py-2.5 px-3 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                disabled={activePlayer.money < 2500000 || activePlayer.isBot || !isMyTurn}
+                className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                  activePlayer.money >= 2500000 && !activePlayer.isBot && isMyTurn
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
               >
                 <KeyRound className="w-4 h-4" />
                 {activePlayer.money >= 2500000
@@ -243,77 +268,115 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
           /* Normal Action Controls Grid */
           <div className="space-y-2.5 pt-1">
             {isOnlineMode && !isMyTurnOnline && (
-              <div className="p-2.5 bg-blue-100 border-2 border-blue-400 rounded-xl flex items-center gap-2 text-blue-900 font-bold text-xs animate-pulse">
-                <span className="text-base">⏳</span>
-                <span>Sedang giliran <b>{activePlayer.name}</b>. Menunggu langkah teman...</span>
+              <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-400 rounded-xl space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-2 text-blue-950 font-black text-xs uppercase tracking-wider font-comic">
+                  <span className="text-base animate-spin">⏳</span>
+                  <span>Giliran Teman: {activePlayer.name} ({activePlayer.avatarEmoji})</span>
+                </div>
+                <p className="text-[11px] text-blue-800 leading-snug">
+                  Sedang giliran <b>{activePlayer.name}</b>. Seluruh tombol aksi Anda dikunci sampai giliran Anda tiba.
+                </p>
+                {myOnlinePlayer && (
+                  <div className="pt-1 flex items-center justify-between text-[11px] text-slate-600 border-t border-blue-200">
+                    <span className="font-medium">Akun Anda:</span>
+                    <span className="font-bold flex items-center gap-1 text-slate-900">
+                      <span>{myOnlinePlayer.avatarEmoji}</span>
+                      <span>{myOnlinePlayer.name}</span>
+                      <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded font-mono font-bold text-[9px]">ONLINE</span>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={() => onRollDice()}
-              disabled={!canRoll || isRolling || activePlayer.isBot}
-              className={`py-3 px-3 rounded-xl font-black text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer ${
-                canRoll && !isRolling && !activePlayer.isBot
-                  ? 'bg-amber-400 hover:bg-amber-500 text-slate-950'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Dices className={`w-4 h-4 ${isRolling ? 'animate-spin text-amber-950' : ''}`} />
-              {isRolling
-                ? 'Mengocok Dadu...'
-                : isHopping && diceRoll
-                ? `Maju ${diceRoll[0] + diceRoll[1]} Petak!`
-                : 'Kocok Dadu!'}
-            </button>
 
-            {/* Buy Property or Corruption Button */}
-            {canBuyProperty ? (
-              <button
-                onClick={onBuyProperty}
-                disabled={activePlayer.money < currentTile.price || activePlayer.isBot}
-                className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activePlayer.money >= currentTile.price && !activePlayer.isBot
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <Building className="w-4 h-4" />
-                Beli Kavling ({formatRupiah(currentTile.price)})
-              </button>
-            ) : (
-              <button
-                onClick={onOpenCorruption}
-                disabled={activePlayer.isBot}
-                className="py-3 px-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <Briefcase className="w-4 h-4" />
-                Korupsi Bawah Meja
-              </button>
+            {isOnlineMode && isMyTurnOnline && (
+              <div className="p-2.5 bg-gradient-to-r from-emerald-100 via-teal-50 to-emerald-100 border-2 border-emerald-500 rounded-xl flex items-center justify-between text-emerald-950 font-black text-xs font-comic shadow-xs animate-pulse">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base animate-bounce">🎲</span>
+                  <span>GILIRAN ANDA SEKARANG!</span>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] rounded-full font-bold">
+                  AKSI AKTIF
+                </span>
+              </div>
             )}
 
-            {/* Sabotage / Joint Venture Button */}
-            <button
-              onClick={onOpenSabotage}
-              disabled={activePlayer.isBot || activePlayer.inJail}
-              className="py-3 px-3 bg-purple-700 hover:bg-purple-800 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Zap className="w-4 h-4 text-yellow-300" />
-              Sabotase & Kongsi
-            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                onClick={() => onRollDice()}
+                disabled={!canRoll || isRolling || activePlayer.isBot || !isMyTurn}
+                className={`py-3 px-3 rounded-xl font-black text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                  canRoll && !isRolling && !activePlayer.isBot && isMyTurn
+                    ? 'bg-amber-400 hover:bg-amber-500 text-slate-950 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <Dices className={`w-4 h-4 ${isRolling ? 'animate-spin text-amber-950' : ''}`} />
+                {isRolling
+                  ? 'Mengocok Dadu...'
+                  : isHopping && diceRoll
+                  ? `Maju ${diceRoll[0] + diceRoll[1]} Petak!`
+                  : !isMyTurn
+                  ? 'Tunggu Giliran'
+                  : 'Kocok Dadu!'}
+              </button>
 
-            {/* End Turn Button */}
-            <button
-              onClick={onEndTurn}
-              disabled={!canEndTurn || activePlayer.isBot}
-              className={`py-3 px-3 rounded-xl font-bold text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 cursor-pointer ${
-                canEndTurn && !activePlayer.isBot
-                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Selesai Giliran
-            </button>
+              {/* Buy Property or Corruption Button */}
+              {canBuyProperty ? (
+                <button
+                  onClick={onBuyProperty}
+                  disabled={activePlayer.money < currentTile.price || activePlayer.isBot || !isMyTurn}
+                  className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                    activePlayer.money >= currentTile.price && !activePlayer.isBot && isMyTurn
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <Building className="w-4 h-4" />
+                  Beli Kavling ({formatRupiah(currentTile.price)})
+                </button>
+              ) : (
+                <button
+                  onClick={onOpenCorruption}
+                  disabled={activePlayer.isBot || !isMyTurn}
+                  className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                    !activePlayer.isBot && isMyTurn
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white cursor-pointer'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Korupsi Bawah Meja
+                </button>
+              )}
+
+              {/* Sabotage / Joint Venture Button */}
+              <button
+                onClick={onOpenSabotage}
+                disabled={activePlayer.isBot || activePlayer.inJail || !isMyTurn}
+                className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                  !activePlayer.isBot && !activePlayer.inJail && isMyTurn
+                    ? 'bg-purple-700 hover:bg-purple-800 text-white cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-yellow-300" />
+                Sabotase & Kongsi
+              </button>
+
+              {/* End Turn Button */}
+              <button
+                onClick={onEndTurn}
+                disabled={!canEndTurn || activePlayer.isBot || !isMyTurn}
+                className={`py-3 px-3 rounded-xl font-bold text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                  canEndTurn && !activePlayer.isBot && isMyTurn
+                    ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                Selesai Giliran
+              </button>
             </div>
           </div>
         )}

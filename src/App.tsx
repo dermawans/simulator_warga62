@@ -44,6 +44,7 @@ import { OnlineChatDrawer } from './components/OnlineChatDrawer';
 import { multiplayerService } from './services/multiplayer';
 import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
 import { DiceRollOverlay, DiceOverlayState } from './components/DiceRollOverlay';
+import { FeedbackModal } from './components/FeedbackModal';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -60,6 +61,7 @@ export default function App() {
   const [saveLoadModalOpen, setSaveLoadModalOpen] = useState(false);
   const [onlineLobbyOpen, setOnlineLobbyOpen] = useState(false);
   const [multiplayerRoom, setMultiplayerRoom] = useState<RoomState | null>(null);
+  const [myOnlinePlayerId, setMyOnlinePlayerId] = useState<string | null>(() => multiplayerService.getCurrentPlayerId());
   const [onlineChatMessages, setOnlineChatMessages] = useState<ChatMessage[]>([]);
   const [diceOverlayState, setDiceOverlayState] = useState<DiceOverlayState | null>(null);
   const [liquidatingPropsModal, setLiquidatingPropsModal] = useState<{
@@ -106,6 +108,7 @@ export default function App() {
   } | null>(null);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   // Leaderboard data
   const [leaderboard, setLeaderboard] = useState<LeaderboardRecord[]>(() => {
@@ -130,6 +133,10 @@ export default function App() {
   const activePlayer = players[activePlayerIndex] || null;
   const currentTile = activePlayer ? tiles[activePlayer.position] : tiles[0];
   const currentEconomic = ECONOMIC_CONDITIONS[economicIndex];
+  const currentMyId = myOnlinePlayerId || (multiplayerRoom ? multiplayerService.getCurrentPlayerId() : null);
+  const isOnlineMode = !!multiplayerRoom;
+  const isMyTurnOnline = !isOnlineMode || (activePlayer !== null && activePlayer.id === currentMyId);
+  const myOnlinePlayer = isOnlineMode ? players.find((p) => p.id === currentMyId) || null : null;
 
   // Calculate Net Worth for a player
   const calculateNetWorth = (p: Player) => {
@@ -263,6 +270,7 @@ export default function App() {
 
   useEffect(() => {
     if (gameState !== 'PLAYING' || !activePlayer || !activePlayer.isBot || isHopping) return;
+    if (multiplayerRoom && multiplayerService.getCurrentPlayerId() !== multiplayerRoom.hostId) return;
 
     // AI Bot thinking delay
     botTurnTimerRef.current = window.setTimeout(() => {
@@ -463,6 +471,85 @@ export default function App() {
           setHasRolled(false);
           setIsRolling(false);
           setIsHopping(false);
+          setRecentLog(`Giliran beralih ke ${players[action.nextPlayerIndex]?.name || 'Pemain Berikutnya'}.`);
+          break;
+        }
+
+        case 'CORRUPTION': {
+          const scheme = CORRUPTION_SCHEMES.find((s) => s.id === action.schemeId);
+          if (!scheme) break;
+          const pIdx = players.findIndex((p) => p.id === senderId);
+          if (pIdx === -1) break;
+
+          if (action.isBusted) {
+            soundManager.playSiren();
+            setTimeout(() => soundManager.playGavel(), 400);
+            const fine = Math.round(scheme.reward * 0.7);
+            setPlayers((prev) => {
+              const next = [...prev];
+              next[pIdx] = {
+                ...next[pIdx],
+                inJail: true,
+                jailTurns: 3,
+                position: 24,
+                money: Math.max(0, next[pIdx].money - fine),
+                totalBribes: next[pIdx].totalBribes + scheme.reward,
+                karma: 10,
+              };
+              return next;
+            });
+            setRecentLog(`🚨 OTT KPK! ${players[pIdx].name} tertangkap tangan korupsi ${scheme.name}!`);
+          } else {
+            soundManager.playMoney();
+            let gain = scheme.reward;
+            if (players[pIdx].characterId === 'pejabat') gain = Math.round(gain * 1.2);
+            setPlayers((prev) => {
+              const next = [...prev];
+              next[pIdx] = {
+                ...next[pIdx],
+                money: next[pIdx].money + gain,
+                totalBribes: next[pIdx].totalBribes + gain,
+                karma: Math.min(100, next[pIdx].karma + scheme.karmaCost),
+              };
+              return next;
+            });
+            setRecentLog(`💰 ${players[pIdx].name} mencairkan proyek ${scheme.name}!`);
+          }
+          break;
+        }
+
+        case 'SABOTAGE': {
+          soundManager.playGavel();
+          const senderIdx = players.findIndex((p) => p.id === senderId);
+          const targetIdx = players.findIndex((p) => p.id === action.targetPlayerId);
+          if (senderIdx === -1 || targetIdx === -1) break;
+
+          if (action.skillId === 'satpol_pp') {
+            const fine = 3500000;
+            setPlayers((prev) => {
+              const next = [...prev];
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - 2500000);
+              next[targetIdx].money = Math.max(0, next[targetIdx].money - fine);
+              return next;
+            });
+            setRecentLog(`${players[senderIdx].name} memanggil Satpol PP untuk menggusur ${players[targetIdx].name}!`);
+          } else if (action.skillId === 'audit_pajak') {
+            setPlayers((prev) => {
+              const next = [...prev];
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - 4000000);
+              const cut = Math.round(next[targetIdx].money * 0.2);
+              next[targetIdx].money = Math.max(0, next[targetIdx].money - cut);
+              return next;
+            });
+            setRecentLog(`Ditjen Pajak mengaudit ${players[targetIdx].name} atas laporan ${players[senderIdx].name}!`);
+          } else if (action.skillId === 'santet_bisnis') {
+            setPlayers((prev) => {
+              const next = [...prev];
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - 3000000);
+              return next;
+            });
+            setRecentLog(`🕯️ ${players[senderIdx].name} mengirim santet ke properti ${players[targetIdx].name}!`);
+          }
           break;
         }
 
@@ -528,6 +615,7 @@ export default function App() {
 
     setPlayers(onlinePlayers);
     setMultiplayerRoom(room);
+    setMyOnlinePlayerId(multiplayerService.getCurrentPlayerId());
     setTiles(INITIAL_BOARD_TILES);
     setActivePlayerIndex(0);
     setRoundCount(1);
@@ -543,6 +631,10 @@ export default function App() {
   // Roll Dice & Move
   const handleRollDice = (customRoll?: any) => {
     if (isRolling || hasRolled || isHopping || !activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
 
     setIsRolling(true);
     soundManager.playDiceRoll();
@@ -878,6 +970,10 @@ export default function App() {
   // Buy Property
   const handleBuyProperty = () => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
     const tile = tiles[activePlayer.position];
     if (tile.ownerId || activePlayer.money < tile.price) return;
 
@@ -901,12 +997,23 @@ export default function App() {
       return next;
     });
 
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'BUY_PROPERTY',
+        tileId: activePlayer.position,
+      });
+    }
+
     setRecentLog(`${activePlayer.name} resmi membeli kavling ${tile.name} seharga ${formatRupiah(tile.price)}!`);
   };
 
   // Upgrade Property
   const handleUpgradeProperty = (tileId: number) => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
     const tile = tiles[tileId];
     if (tile.ownerId !== activePlayer.id || tile.houses >= 3 || activePlayer.money < tile.housePrice) return;
 
@@ -932,6 +1039,14 @@ export default function App() {
       return next;
     });
 
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'UPGRADE_PROPERTY',
+        tileId,
+        newHouses: newTier,
+      });
+    }
+
     if (newTier === 3) {
       confetti({ particleCount: 60, spread: 60 });
     }
@@ -944,6 +1059,10 @@ export default function App() {
   // Sell Property to bank (75% value)
   const handleSellProperty = (tileId: number) => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
     const tile = tiles[tileId];
     if (tile.ownerId !== activePlayer.id) return;
 
@@ -970,6 +1089,13 @@ export default function App() {
       };
       return next;
     });
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'SELL_PROPERTY',
+        tileId,
+      });
+    }
 
     // Trigger visual burning/free-fall liquidation animation
     setLiquidatingTileIds([tileId]);
@@ -999,8 +1125,20 @@ export default function App() {
   // Commit Corruption Under the Table
   const handleCommitCorruption = (scheme: typeof CORRUPTION_SCHEMES[0], isBusted: boolean) => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
 
     setCorruptionModalOpen(false);
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'CORRUPTION',
+        schemeId: scheme.id,
+        isBusted,
+      });
+    }
 
     if (isBusted) {
       // KPK BUSTED!
@@ -1059,8 +1197,20 @@ export default function App() {
   // Sabotage execution
   const handleExecuteSabotage = (skillId: string, targetPlayerId: string, propertyId?: number) => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
     const targetPlayer = players.find((p) => p.id === targetPlayerId);
     if (!targetPlayer) return;
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'SABOTAGE',
+        targetPlayerId,
+        skillId,
+      });
+    }
 
     if (skillId === 'satpol_pp') {
       const fine = 3500000;
@@ -1182,6 +1332,10 @@ export default function App() {
   // Pay Bail out of Sukamiskin
   const handlePayBail = () => {
     if (!activePlayer || activePlayer.money < 2500000) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
     soundManager.playMoney();
 
     setPlayers((prev) => {
@@ -1192,6 +1346,13 @@ export default function App() {
       curr.jailTurns = 0;
       return next;
     });
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'PAY_BAIL',
+        amount: 2500000,
+      });
+    }
 
     setRecentLog(`${activePlayer.name} menyetor uang damai Rp 2.500.000 dan bebas dari Sukamiskin!`);
   };
@@ -1270,6 +1431,10 @@ export default function App() {
   // End Turn
   const handleEndTurn = () => {
     if (!activePlayer) return;
+    if (isOnlineMode && !isMyTurnOnline) {
+      soundManager.playBoing();
+      return;
+    }
 
     // 1. Check if player has served jail turn
     if (activePlayer.inJail) {
@@ -1340,17 +1505,24 @@ export default function App() {
     }
 
     // Round counter updates when cycling back to index 0
+    let nextRound = roundCount;
     if (nextIdx === 0) {
-      setRoundCount((prev) => {
-        const nextRound = prev + 1;
-        setRecentLog(`🔔 Putaran ke-${nextRound}/30 dimulai! Persaingan semakin panas.`);
-        return nextRound;
-      });
+      nextRound = roundCount + 1;
+      setRoundCount(nextRound);
+      setRecentLog(`🔔 Putaran ke-${nextRound}/30 dimulai! Persaingan semakin panas.`);
     }
 
     setActivePlayerIndex(nextIdx);
     setHasRolled(false);
     setRecentLog(`Giliran beralih ke ${players[nextIdx].name}.`);
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'END_TURN',
+        nextPlayerIndex: nextIdx,
+        roundCount: nextRound,
+      });
+    }
   };
 
   // Reset Game
@@ -1362,6 +1534,9 @@ export default function App() {
     setEconomicTurnCountdown(5);
     setRoundCount(1);
     setGameOverData(null);
+    setMultiplayerRoom(null);
+    setMyOnlinePlayerId(null);
+    multiplayerService.disconnect();
     setRecentLog('Permainan direset.');
   };
 
@@ -1390,6 +1565,7 @@ export default function App() {
         onOpenRules={() => setRulesOpen(true)}
         onOpenSaveLoad={() => setSaveLoadModalOpen(true)}
         onOpenMultiplayer={() => setOnlineLobbyOpen(true)}
+        onOpenFeedback={() => setFeedbackModalOpen(true)}
         multiplayerRoomCode={multiplayerRoom?.code}
         onResetGame={handleResetGame}
         inGame={gameState === 'PLAYING'}
@@ -1402,6 +1578,7 @@ export default function App() {
             onStartGame={handleStartGame}
             onOpenSaveLoad={() => setSaveLoadModalOpen(true)}
             onOpenOnlineMultiplayer={() => setOnlineLobbyOpen(true)}
+            onOpenFeedback={() => setFeedbackModalOpen(true)}
           />
         ) : (
           <div className="w-full space-y-4">
@@ -1435,6 +1612,7 @@ export default function App() {
               activePlayer={activePlayer}
               tiles={tiles}
               onOpenKarmaInfo={(p) => setKarmaModalPlayer(p)}
+              myOnlinePlayerId={currentMyId}
             />
 
             {/* Board & Side HUD layout */}
@@ -1466,20 +1644,22 @@ export default function App() {
                   activePlayer={activePlayer}
                   tiles={tiles}
                   currentTile={currentTile}
-                  canRoll={!hasRolled && !isRolling && !isHopping && !activePlayer.inJail}
-                  canEndTurn={(hasRolled || activePlayer.inJail) && !isRolling && !isHopping}
+                  canRoll={!hasRolled && !isRolling && !isHopping && !activePlayer.inJail && isMyTurnOnline}
+                  canEndTurn={(hasRolled || activePlayer.inJail) && !isRolling && !isHopping && isMyTurnOnline}
                   canBuyProperty={
                     hasRolled &&
                     !isRolling &&
                     !isHopping &&
                     (currentTile.type === 'property' || currentTile.type === 'bumn') &&
-                    !currentTile.ownerId
+                    !currentTile.ownerId &&
+                    isMyTurnOnline
                   }
                   canUpgradeProperty={
                     currentTile.type === 'property' &&
                     currentTile.ownerId === activePlayer.id &&
                     currentTile.houses < 3 &&
-                    !isHopping
+                    !isHopping &&
+                    isMyTurnOnline
                   }
                   onRollDice={() => handleRollDice()}
                   onEndTurn={handleEndTurn}
@@ -1493,6 +1673,9 @@ export default function App() {
                   isRolling={isRolling}
                   isHopping={isHopping}
                   diceRoll={diceRoll}
+                  isOnlineMode={isOnlineMode}
+                  isMyTurnOnline={isMyTurnOnline}
+                  myOnlinePlayer={myOnlinePlayer}
                 />
               </div>
             </div>
@@ -1501,8 +1684,14 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-300 bg-amber-100/50 py-3 text-center text-xs text-slate-600 font-medium">
-        Simulator Warga62 © 2026 · Game Monopoli Satir Kehidupan Nyata Indonesia
+      <footer className="w-full border-t border-slate-300 bg-amber-100/50 py-3 px-4 text-center text-xs text-slate-600 font-medium flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        <span>Simulator Warga62 © 2026 · Game Monopoli Satir Kehidupan Nyata Indonesia</span>
+        <button
+          onClick={() => setFeedbackModalOpen(true)}
+          className="text-amber-900 font-bold hover:text-red-700 underline flex items-center gap-1 cursor-pointer transition-colors"
+        >
+          <span>📮 Kotak Aduan & Request Fitur</span>
+        </button>
       </footer>
 
       {/* MODALS */}
@@ -1516,6 +1705,9 @@ export default function App() {
           onUpgrade={(id) => handleUpgradeProperty(id)}
           onSellProperty={(id) => handleSellProperty(id)}
           activePlayer={activePlayer}
+          isOnlineMode={isOnlineMode}
+          isMyTurnOnline={isMyTurnOnline}
+          myOnlinePlayerId={currentMyId}
         />
       )}
 
@@ -1680,6 +1872,15 @@ export default function App() {
 
       {/* 16. Dynamic 3D Dice Roll & Reveal Overlay */}
       <DiceRollOverlay state={diceOverlayState} />
+
+      {/* 17. Citizen Feedback & Bug Report Modal */}
+      <FeedbackModal
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        currentUserName={activePlayer?.name || 'Warga 62'}
+        roundCount={roundCount}
+        multiplayerRoomCode={multiplayerRoom?.code}
+      />
     </div>
   );
 }

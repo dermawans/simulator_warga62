@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { Player, CharacterPreset } from '../types/game';
 import { CHARACTER_PRESETS, ACCESSORIES_OPTIONS } from '../data/characters';
 import { soundManager } from '../utils/audio';
-import { Users, Bot, Sparkles, Play, Shield, RefreshCw, Globe } from 'lucide-react';
+import { Users, Bot, Sparkles, Play, Shield, RefreshCw, Globe, MessageSquarePlus } from 'lucide-react';
 import simulatorWniBanner from '../assets/images/simulator_wni_banner_1791190534170.jpg';
 
 interface CharacterCustomizerProps {
   onStartGame: (players: Player[]) => void;
   onOpenSaveLoad?: () => void;
   onOpenOnlineMultiplayer?: () => void;
+  onOpenFeedback?: () => void;
 }
 
 export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
   onStartGame,
   onOpenSaveLoad,
-  onOpenOnlineMultiplayer
+  onOpenOnlineMultiplayer,
+  onOpenFeedback
 }) => {
   const [mode, setMode] = useState<'SINGLE_BOT' | 'MULTIPLAYER'>('SINGLE_BOT');
   const [playerCount, setPlayerCount] = useState<number>(3);
@@ -436,10 +438,20 @@ export const CharacterCustomizer: React.FC<CharacterCustomizerProps> = ({
           {onOpenSaveLoad && (
             <button
               onClick={onOpenSaveLoad}
-              className="py-4 px-6 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+              className="py-4 px-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
-              Lanjut Game (Cloud)
+              Lanjut (Cloud)
+            </button>
+          )}
+          {onOpenFeedback && (
+            <button
+              onClick={onOpenFeedback}
+              className="py-4 px-4 bg-slate-900 hover:bg-slate-800 text-yellow-300 font-black text-xs sm:text-sm font-comic uppercase tracking-wider rounded-2xl comic-box comic-btn-hover flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+              title="Lapor Bug & Kotak Saran Warga"
+            >
+              <MessageSquarePlus className="w-4 h-4 text-rose-500" />
+              <span>Lapor / Saran</span>
             </button>
           )}
         </div>

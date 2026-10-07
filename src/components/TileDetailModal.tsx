@@ -12,6 +12,9 @@ interface TileDetailModalProps {
   onUpgrade?: (tileId: number) => void;
   onSellProperty?: (tileId: number) => void;
   activePlayer: Player;
+  isOnlineMode?: boolean;
+  isMyTurnOnline?: boolean;
+  myOnlinePlayerId?: string | null;
 }
 
 export const TileDetailModal: React.FC<TileDetailModalProps> = ({
@@ -21,14 +24,20 @@ export const TileDetailModal: React.FC<TileDetailModalProps> = ({
   onClose,
   onUpgrade,
   onSellProperty,
-  activePlayer
+  activePlayer,
+  isOnlineMode = false,
+  isMyTurnOnline = true,
+  myOnlinePlayerId = null
 }) => {
   if (!tile) return null;
 
   const owner = players.find((p) => p.id === tile.ownerId);
-  const isOwner = owner?.id === activePlayer.id;
-  const canUpgrade = isOwner && tile.type === 'property' && tile.houses < 3 && activePlayer.money >= tile.housePrice;
-  const canSell = isOwner && (tile.type === 'property' || tile.type === 'bumn') && onSellProperty;
+  const isOwner = isOnlineMode
+    ? !!(myOnlinePlayerId && owner?.id === myOnlinePlayerId)
+    : owner?.id === activePlayer.id;
+  const canManage = isOwner && (!isOnlineMode || isMyTurnOnline);
+  const canUpgrade = canManage && tile.type === 'property' && tile.houses < 3 && activePlayer.money >= tile.housePrice;
+  const canSell = canManage && (tile.type === 'property' || tile.type === 'bumn') && onSellProperty;
   const sellValue = Math.round(tile.price * 0.75);
 
   return (
