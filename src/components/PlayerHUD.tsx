@@ -248,20 +248,28 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
               </button>
 
               {/* Secondary: Suap Sipir */}
-              <button
-                onClick={onPayBail}
-                disabled={activePlayer.money < 2500000 || activePlayer.isBot || !isMyTurn}
-                className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
-                  activePlayer.money >= 2500000 && !activePlayer.isBot && isMyTurn
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                }`}
-              >
-                <KeyRound className="w-4 h-4" />
-                {activePlayer.money >= 2500000
-                  ? 'Suap Sipir Bebas Instan (Rp 2.500.000)'
-                  : 'Suap Sipir (Perlu Rp 2,5 Jt - Saldo Kas 0)'}
-              </button>
+              {(() => {
+                const bailCost = activePlayer.characterId === 'pengacara_sultan' ? 1250000 : 2500000;
+                const canAffordBail = activePlayer.money >= bailCost;
+                return (
+                  <button
+                    onClick={onPayBail}
+                    disabled={!canAffordBail || activePlayer.isBot || !isMyTurn}
+                    className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                      canAffordBail && !activePlayer.isBot && isMyTurn
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    {canAffordBail
+                      ? (activePlayer.characterId === 'pengacara_sultan'
+                          ? `⚖️ Suap Sipir Hotman Paris (${formatRupiah(bailCost)})`
+                          : `Suap Sipir Bebas Instan (${formatRupiah(bailCost)})`)
+                      : `Suap Sipir (Perlu ${formatRupiah(bailCost)} - Saldo Kurang)`}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         ) : (
@@ -323,18 +331,28 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
 
               {/* Buy Property or Corruption Button */}
               {canBuyProperty ? (
-                <button
-                  onClick={onBuyProperty}
-                  disabled={activePlayer.money < currentTile.price || activePlayer.isBot || !isMyTurn}
-                  className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
-                    activePlayer.money >= currentTile.price && !activePlayer.isBot && isMyTurn
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                  }`}
-                >
-                  <Building className="w-4 h-4" />
-                  Beli Kavling ({formatRupiah(currentTile.price)})
-                </button>
+                (() => {
+                  const buyPrice = activePlayer.characterId === 'menteri_segala_urusan'
+                    ? Math.round(currentTile.price * 0.8)
+                    : currentTile.price;
+                  const canAffordBuy = activePlayer.money >= buyPrice;
+                  return (
+                    <button
+                      onClick={onBuyProperty}
+                      disabled={!canAffordBuy || activePlayer.isBot || !isMyTurn}
+                      className={`py-3 px-3 rounded-xl font-bold text-xs comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
+                        canAffordBuy && !activePlayer.isBot && isMyTurn
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <Building className="w-4 h-4" />
+                      {activePlayer.characterId === 'menteri_segala_urusan'
+                        ? `Beli (Diskon PSN: ${formatRupiah(buyPrice)})`
+                        : `Beli Kavling (${formatRupiah(buyPrice)})`}
+                    </button>
+                  );
+                })()
               ) : (
                 <button
                   onClick={onOpenCorruption}

@@ -34,8 +34,12 @@ export const TaxModal: React.FC<TaxModalProps> = ({
     bracketLabel = 'Tarif Menengah Mapan (Rp 20 Jt - 50 Jt)';
   }
 
-  // Base calculated tax
-  const fullTax = Math.round(netWorth * taxRate * 0.1 * economic.taxMultiplier); // 1% - 2.5% effective of net worth for game balance
+  // Base calculated tax (Emak-Emak Matic discount 50%)
+  let calculatedTax = Math.round(netWorth * taxRate * 0.1 * economic.taxMultiplier); // 1% - 2.5% effective
+  if (player.characterId === 'emak_matic') {
+    calculatedTax = Math.round(calculatedTax * 0.5);
+  }
+  const fullTax = calculatedTax;
   const bribeTax = Math.round(fullTax * 0.35); // 35% under the table
 
   return (
@@ -59,6 +63,12 @@ export const TaxModal: React.FC<TaxModalProps> = ({
           </p>
 
           <div className="bg-white p-3.5 rounded-xl comic-box-sm space-y-2 text-xs">
+            {player.characterId === 'emak_matic' && (
+              <div className="p-2 bg-rose-100 border border-rose-300 rounded-lg text-rose-800 font-bold flex items-center gap-1.5">
+                <span>🧕🏼</span>
+                <span>Perk Bu Tejo Gaspol: Diskon 50% Tilang & Pajak Warga!</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-600">
               <span>Estimasi Nilai Kekayaan Total:</span>
               <span className="font-bold text-slate-900 font-mono">{formatRupiah(netWorth)}</span>

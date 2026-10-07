@@ -36,7 +36,10 @@ export const TileDetailModal: React.FC<TileDetailModalProps> = ({
     ? !!(myOnlinePlayerId && owner?.id === myOnlinePlayerId)
     : owner?.id === activePlayer.id;
   const canManage = isOwner && (!isOnlineMode || isMyTurnOnline);
-  const canUpgrade = canManage && tile.type === 'property' && tile.houses < 3 && activePlayer.money >= tile.housePrice;
+  const effectiveUpgradePrice = activePlayer.characterId === 'driver_ojol'
+    ? Math.round(tile.housePrice * 0.75)
+    : tile.housePrice;
+  const canUpgrade = canManage && tile.type === 'property' && tile.houses < 3 && activePlayer.money >= effectiveUpgradePrice;
   const canSell = canManage && (tile.type === 'property' || tile.type === 'bumn') && onSellProperty;
   const sellValue = Math.round(tile.price * 0.75);
 
@@ -159,7 +162,8 @@ export const TileDetailModal: React.FC<TileDetailModalProps> = ({
                 className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl comic-box-sm comic-btn-hover flex items-center justify-center gap-2 cursor-pointer text-xs"
               >
                 <Coins className="w-4 h-4" />
-                Upgrade ke {UPGRADE_TIERS[tile.houses + 1].label} ({formatRupiah(tile.housePrice)})
+                Upgrade ke {UPGRADE_TIERS[tile.houses + 1].label} ({formatRupiah(effectiveUpgradePrice)})
+                {activePlayer.characterId === 'driver_ojol' && ' (Diskon Ojol 25%)'}
               </button>
             )}
 

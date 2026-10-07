@@ -29,8 +29,17 @@ export const SabotageModal: React.FC<SabotageModalProps> = ({
   );
   const [selectedPropertyId, setSelectedPropertyId] = useState<number>(0);
 
+  const isHacker = activePlayer.characterId === 'programmer_scam';
+  const targetPlayer = otherPlayers.find((p) => p.id === selectedTargetPlayerId);
+  const isTargetImmune = targetPlayer?.characterId === 'programmer_scam';
+
   const selectedSkill = SABOTAGE_SKILLS.find((s) => s.id === selectedSkillId);
-  const canAfford = selectedSkill ? activePlayer.money >= selectedSkill.cost : false;
+  const effectiveCost = selectedSkill
+    ? isHacker
+      ? Math.max(1000000, selectedSkill.cost - 1000000)
+      : selectedSkill.cost
+    : 0;
+  const canAfford = selectedSkill ? activePlayer.money >= effectiveCost : false;
 
   // Find properties owned by selected target player
   const targetProperties = tiles.filter((t) => t.ownerId === selectedTargetPlayerId);
@@ -140,7 +149,8 @@ export const SabotageModal: React.FC<SabotageModalProps> = ({
                 </label>
                 {SABOTAGE_SKILLS.map((skill) => {
                   const isSelected = selectedSkillId === skill.id;
-                  const affordable = activePlayer.money >= skill.cost;
+                  const skillCost = isHacker ? Math.max(1000000, skill.cost - 1000000) : skill.cost;
+                  const affordable = activePlayer.money >= skillCost;
                   return (
                     <div
                       key={skill.id}
@@ -157,11 +167,16 @@ export const SabotageModal: React.FC<SabotageModalProps> = ({
                           <div>
                             <p className="text-xs font-bold text-slate-900 font-comic">{skill.name}</p>
                             <p className="text-[11px] text-slate-600">{skill.description}</p>
+                            {isHacker && (
+                              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5 inline-block">
+                                Diskon Hacker: -Rp 1.000.000
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           <span className={`text-xs font-bold font-mono ${affordable ? 'text-slate-900' : 'text-rose-600'}`}>
-                            {formatRupiah(skill.cost)}
+                            {formatRupiah(skillCost)}
                           </span>
                         </div>
                       </div>
@@ -169,6 +184,17 @@ export const SabotageModal: React.FC<SabotageModalProps> = ({
                   );
                 })}
               </div>
+
+              {/* Target immunity warning if applicable */}
+              {isTargetImmune && (
+                <div className="p-2.5 bg-amber-100 border-2 border-amber-400 rounded-xl text-amber-900 text-xs flex items-center gap-2">
+                  <span className="text-lg">🛡️</span>
+                  <div>
+                    <strong className="block font-bold">Target Kebal Sabotase!</strong>
+                    <span>{targetPlayer?.name} (Siti Hacker) memiliki firewall anti-sabotase. Serangan ini tidak akan berdampak pada asetnya.</span>
+                  </div>
+                </div>
+              )}
 
               {/* If freeze property chosen and target has properties, pick which one */}
               {selectedSkill?.effectType === 'FREEZE_PROPERTY' && targetProperties.length > 0 && (
@@ -200,7 +226,7 @@ export const SabotageModal: React.FC<SabotageModalProps> = ({
                 }`}
               >
                 <ShieldAlert className="w-4 h-4" />
-                Luncurkan Sabotase ({formatRupiah(selectedSkill?.cost || 0)})
+                Luncurkan Sabotase ({formatRupiah(effectiveCost)})
               </button>
             </>
           ) : (

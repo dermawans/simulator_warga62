@@ -135,6 +135,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     const myPlayer: RoomPlayer = {
       id: `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: playerName.trim(),
+      characterId: activePreset.id,
       avatarEmoji: activePreset.avatarEmoji,
       color: selectedColor,
       accessory: activePreset.accessory,
@@ -161,6 +162,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     const myPlayer: RoomPlayer = {
       id: `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: playerName.trim(),
+      characterId: activePreset.id,
       avatarEmoji: activePreset.avatarEmoji,
       color: selectedColor,
       accessory: activePreset.accessory,
@@ -189,6 +191,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     const myPlayer: RoomPlayer = {
       id: `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: playerName.trim(),
+      characterId: activePreset.id,
       avatarEmoji: activePreset.avatarEmoji,
       color: selectedColor,
       accessory: activePreset.accessory,
@@ -365,18 +368,24 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
 
                 {/* Preset Picker */}
                 <div>
-                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
-                    Pilih Karakter Warga:
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {CHARACTER_PRESETS.slice(0, 4).map((preset) => (
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] text-slate-700 font-bold font-comic uppercase tracking-wider block">
+                      Pilih Karakter Warga ({CHARACTER_PRESETS.length} Pilihan):
+                    </label>
+                    <span className="text-[10px] text-blue-600 font-bold">
+                      {activePreset.name} ({activePreset.role})
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 max-h-56 overflow-y-auto p-1 bg-slate-100/70 rounded-2xl border-2 border-slate-300">
+                    {CHARACTER_PRESETS.map((preset) => (
                       <button
                         key={preset.id}
+                        type="button"
                         onClick={() => setSelectedPresetId(preset.id)}
                         className={`p-2 rounded-xl border-2 text-left cursor-pointer transition-all ${
                           selectedPresetId === preset.id
-                            ? 'bg-blue-100 border-slate-900 shadow-xs ring-2 ring-blue-400'
-                            : 'bg-white border-slate-300 hover:border-slate-500'
+                            ? 'bg-blue-100 border-slate-900 shadow-sm ring-2 ring-blue-500 scale-102'
+                            : 'bg-white border-slate-300 hover:border-slate-500 hover:bg-slate-50'
                         }`}
                       >
                         <div className="text-xl mb-0.5">{preset.avatarEmoji}</div>
@@ -386,6 +395,22 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
                         <p className="text-[9px] text-slate-500 truncate">{preset.role}</p>
                       </button>
                     ))}
+                  </div>
+
+                  {/* Active Character Perk Spotlight Card */}
+                  <div className="mt-2.5 p-2.5 bg-amber-100/80 rounded-xl border-2 border-amber-300 text-xs flex items-start gap-2.5">
+                    <span className="text-lg shrink-0 mt-0.5">{activePreset.avatarEmoji}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-amber-950 font-comic">{activePreset.name}</span>
+                        <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-mono font-bold">
+                          {activePreset.title}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 leading-snug mt-0.5">
+                        <strong className="text-amber-900">✨ Skill Khusus:</strong> {activePreset.perkDescription}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

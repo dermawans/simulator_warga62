@@ -3,6 +3,7 @@ import { Player, BoardTile } from './game';
 export interface RoomPlayer {
   id: string;
   name: string;
+  characterId?: string;
   avatarEmoji: string;
   color: string;
   accessory: string;

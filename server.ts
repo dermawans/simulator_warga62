@@ -17,6 +17,7 @@ interface ClientMeta {
 interface RoomPlayer {
   id: string;
   name: string;
+  characterId?: string;
   avatarEmoji: string;
   color: string;
   accessory: string;
@@ -123,6 +124,7 @@ async function startServer() {
       players: room.players.map((p) => ({
         id: p.id,
         name: p.name,
+        characterId: p.characterId,
         avatarEmoji: p.avatarEmoji,
         color: p.color,
         isHost: p.isHost,
@@ -192,6 +194,7 @@ async function startServer() {
             const newPlayer: RoomPlayer = {
               id: player.id,
               name: player.name,
+              characterId: player.characterId || 'pejabat',
               avatarEmoji: player.avatarEmoji,
               color: player.color,
               accessory: player.accessory || '',

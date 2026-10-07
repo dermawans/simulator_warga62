@@ -31,9 +31,13 @@ export const CorruptionModal: React.FC<CorruptionModalProps> = ({
 
     setTimeout(() => {
       // Calculate risk: base scheme risk + player's current karma * multiplier
+      let baseRisk = selectedScheme.riskPercent * economic.corruptionRiskMultiplier + player.karma * 0.4;
+      if (player.characterId === 'ustadz_kondang') {
+        baseRisk = baseRisk * 0.75; // Ustadz perk: -25% OTT risk
+      }
       const effectiveRisk = Math.min(
         95,
-        Math.round(selectedScheme.riskPercent * economic.corruptionRiskMultiplier + player.karma * 0.4)
+        Math.max(5, Math.round(baseRisk))
       );
 
       const roll = Math.random() * 100;
@@ -89,10 +93,15 @@ export const CorruptionModal: React.FC<CorruptionModalProps> = ({
         {/* Schemes List */}
         <div className="p-5 space-y-3 max-h-[50vh] overflow-y-auto">
           {CORRUPTION_SCHEMES.map((scheme) => {
+            let baseRisk = scheme.riskPercent * economic.corruptionRiskMultiplier + player.karma * 0.4;
+            if (player.characterId === 'ustadz_kondang') {
+              baseRisk = baseRisk * 0.75;
+            }
             const calculatedRisk = Math.min(
               95,
-              Math.round(scheme.riskPercent * economic.corruptionRiskMultiplier + player.karma * 0.4)
+              Math.max(5, Math.round(baseRisk))
             );
+            const displayReward = player.characterId === 'pejabat' ? Math.round(scheme.reward * 1.2) : scheme.reward;
             const isSelected = selectedSchemeId === scheme.id;
 
             return (
@@ -111,11 +120,21 @@ export const CorruptionModal: React.FC<CorruptionModalProps> = ({
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm font-comic">{scheme.name}</h4>
                       <p className="text-xs text-slate-600 mt-0.5">{scheme.description}</p>
+                      {player.characterId === 'pejabat' && (
+                        <span className="text-[10px] text-amber-700 bg-amber-200 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                          ✨ Bonus Pejabat: +20% Hasil Cair
+                        </span>
+                      )}
+                      {player.characterId === 'ustadz_kondang' && (
+                        <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                          🕊️ Doa Ustadz: Risiko OTT -25%
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-sm font-bold text-emerald-600 font-mono block">
-                      +{formatRupiah(scheme.reward)}
+                      +{formatRupiah(displayReward)}
                     </span>
                     <span className="text-[11px] font-semibold text-rose-600">
                       Risiko OTT: {calculatedRisk}%

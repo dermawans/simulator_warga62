@@ -45,6 +45,7 @@ import { multiplayerService } from './services/multiplayer';
 import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
 import { DiceRollOverlay, DiceOverlayState } from './components/DiceRollOverlay';
 import { FeedbackModal } from './components/FeedbackModal';
+import { CHARACTER_PRESETS } from './data/characters';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -524,28 +525,41 @@ export default function App() {
           const targetIdx = players.findIndex((p) => p.id === action.targetPlayerId);
           if (senderIdx === -1 || targetIdx === -1) break;
 
+          // Target is immune if Siti Hacker (programmer_scam)
+          if (players[targetIdx].characterId === 'programmer_scam') {
+            soundManager.playBoing();
+            setRecentLog(`🛡️ Sabotase Gagal! ${players[targetIdx].name} (Siti Hacker) kebal sabotase lawan!`);
+            break;
+          }
+
+          const isHackerSender = players[senderIdx].characterId === 'programmer_scam';
+          const discount = isHackerSender ? 1000000 : 0;
+
           if (action.skillId === 'satpol_pp') {
             const fine = 3500000;
+            const cost = Math.max(1000000, 2500000 - discount);
             setPlayers((prev) => {
               const next = [...prev];
-              next[senderIdx].money = Math.max(0, next[senderIdx].money - 2500000);
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - cost);
               next[targetIdx].money = Math.max(0, next[targetIdx].money - fine);
               return next;
             });
             setRecentLog(`${players[senderIdx].name} memanggil Satpol PP untuk menggusur ${players[targetIdx].name}!`);
           } else if (action.skillId === 'audit_pajak') {
+            const cost = Math.max(1000000, 4000000 - discount);
             setPlayers((prev) => {
               const next = [...prev];
-              next[senderIdx].money = Math.max(0, next[senderIdx].money - 4000000);
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - cost);
               const cut = Math.round(next[targetIdx].money * 0.2);
               next[targetIdx].money = Math.max(0, next[targetIdx].money - cut);
               return next;
             });
             setRecentLog(`Ditjen Pajak mengaudit ${players[targetIdx].name} atas laporan ${players[senderIdx].name}!`);
           } else if (action.skillId === 'santet_bisnis') {
+            const cost = Math.max(1000000, 3000000 - discount);
             setPlayers((prev) => {
               const next = [...prev];
-              next[senderIdx].money = Math.max(0, next[senderIdx].money - 3000000);
+              next[senderIdx].money = Math.max(0, next[senderIdx].money - cost);
               return next;
             });
             setRecentLog(`🕯️ ${players[senderIdx].name} mengirim santet ke properti ${players[targetIdx].name}!`);
@@ -592,26 +606,30 @@ export default function App() {
 
   // Start game from online multiplayer lobby
   const handleStartMultiplayerGame = (room: RoomState, roomPlayers: RoomPlayer[]) => {
-    const onlinePlayers: Player[] = roomPlayers.map((rp) => ({
-      id: rp.id,
-      name: rp.name,
-      role: 'Warga Online',
-      characterId: 'pejabat',
-      avatarEmoji: rp.avatarEmoji,
-      accessory: rp.accessory || 'HP & Kuota',
-      quote: rp.quote || 'Siap mabar jadi Sultan!',
-      color: rp.color,
-      money: 20000000,
-      position: 0,
-      inJail: false,
-      jailTurns: 0,
-      karma: 0,
-      totalBribes: 0,
-      totalTaxesPaid: 0,
-      sabotagesRemaining: 2,
-      isBankrupt: false,
-      isBot: false,
-    }));
+    const onlinePlayers: Player[] = roomPlayers.map((rp) => {
+      const charPreset = CHARACTER_PRESETS.find((p) => p.id === rp.characterId) || CHARACTER_PRESETS[0];
+      const startingMoney = rp.characterId === 'bos_pinjol' ? 25000000 : 20000000;
+      return {
+        id: rp.id,
+        name: rp.name,
+        role: charPreset.role,
+        characterId: rp.characterId || charPreset.id,
+        avatarEmoji: rp.avatarEmoji || charPreset.avatarEmoji,
+        accessory: rp.accessory || charPreset.accessory,
+        quote: rp.quote || charPreset.quote,
+        color: rp.color || charPreset.color,
+        money: startingMoney,
+        position: 0,
+        inJail: false,
+        jailTurns: 0,
+        karma: 0,
+        totalBribes: 0,
+        totalTaxesPaid: 0,
+        sabotagesRemaining: rp.characterId === 'programmer_scam' ? 4 : 2,
+        isBankrupt: false,
+        isBot: false,
+      };
+    });
 
     setPlayers(onlinePlayers);
     setMultiplayerRoom(room);
@@ -719,8 +737,8 @@ export default function App() {
         soundManager.playMoney();
         let bonus = 5000000; // Gaji UMR
         let subNote = 'Gaji Pokok WNI';
-        if (activePlayer.characterId === 'mahasiswa') {
-          bonus += 2500000; // Mahasiswa perk
+        if (activePlayer.characterId === 'mahasiswa_demo' || activePlayer.characterId === 'mahasiswa') {
+          bonus += 2500000; // Mahasiswa perk (Tunjangan Magang)
           subNote = 'Termasuk Tunjangan Magang Mahasiswa';
         }
         if (accumulatedMoney < 3000000) {
@@ -829,7 +847,11 @@ export default function App() {
         origin: { y: 0.6 },
       });
 
-      const jackpot = arisanPot;
+      let jackpot = arisanPot;
+      if (player.characterId === 'bandar_arisan') {
+        jackpot = Math.round(jackpot * 1.25);
+      }
+
       setPlayers((prev) => {
         const next = [...prev];
         next[activePlayerIndex] = {
@@ -841,11 +863,15 @@ export default function App() {
       });
 
       setArisanPot(2000000); // reset baseline pot
-      setRecentLog(`🎉 SELAMAT! ${player.name} menang arisan warga RT senilai ${formatRupiah(jackpot)}!`);
+      if (player.characterId === 'bandar_arisan') {
+        setRecentLog(`🎉 EXTRA CUAN! ${player.name} (Bandar Arisan) kocok arisan & raih bonus +25%: ${formatRupiah(jackpot)}!`);
+      } else {
+        setRecentLog(`🎉 SELAMAT! ${player.name} menang arisan warga RT senilai ${formatRupiah(jackpot)}!`);
+      }
 
       setEventCard({
         id: 'win_arisan',
-        title: 'MENANG ARISAN WARGA RT! 🎁',
+        title: player.characterId === 'bandar_arisan' ? 'MENANG ARISAN + BONUS BANDAR! 🎁' : 'MENANG ARISAN WARGA RT! 🎁',
         category: 'ARISAN',
         description: 'Nama Anda keluar dari kocokan gelas arisan emak-emak komplek! Seluruh kas warga diserahkan kepada Anda.',
         effectDescription: `Uang tunai kas arisan bertambah +${formatRupiah(jackpot)}.`,
@@ -864,7 +890,10 @@ export default function App() {
       } else {
         // Bot auto honest tax
         const netWorth = calculateNetWorth(player);
-        const taxAmount = Math.round(netWorth * 0.03);
+        let taxAmount = Math.round(netWorth * 0.03);
+        if (player.characterId === 'emak_matic') {
+          taxAmount = Math.round(taxAmount * 0.5);
+        }
         setPlayers((prev) => {
           const next = [...prev];
           next[activePlayerIndex] = {
@@ -880,7 +909,23 @@ export default function App() {
     }
 
     if (tileIndex === 16) {
-      // Parkir Liar Indomaret
+      // Preman Parkir perk: collect Rp 1.000.000 instead of paying
+      if (player.characterId === 'preman_parkir') {
+        soundManager.playMoney();
+        const setoran = 1000000;
+        setPlayers((prev) => {
+          const next = [...prev];
+          next[activePlayerIndex] = {
+            ...next[activePlayerIndex],
+            money: next[activePlayerIndex].money + setoran,
+          };
+          return next;
+        });
+        setRecentLog(`🧢 Prit-prit! ${player.name} (Bang Jago Parkir) memungut setoran parkir ${formatRupiah(setoran)} dari kas warga!`);
+        return;
+      }
+
+      // Normal Parkir Liar Indomaret
       soundManager.playBoing();
       const parkingFee = 200000; // Rp 200rb
       setPlayers((prev) => {
@@ -896,6 +941,13 @@ export default function App() {
     }
 
     if (tile.type === 'event' || tileIndex === 20) {
+      // Emak-Emak Matic perk: 50% chance to dodge razia police raid
+      if (tileIndex === 20 && player.characterId === 'emak_matic' && Math.random() < 0.5) {
+        soundManager.playFanfare();
+        setRecentLog(`🧕🏼 Sen Kiri Belok Kanan! ${player.name} berhasil lolos dari razia polisi lalu lintas tanpa kena tilang!`);
+        return;
+      }
+
       // Random Event Card
       let cardList = NASIB_CARDS;
       if (tileIndex === 20) {
@@ -921,9 +973,15 @@ export default function App() {
           rent = Math.round(rent * 0.7);
         }
 
-        // Alvin SCBD perk: +25% rent in Jakarta
-        if (owner.characterId === 'anak_jaksel' && tile.city === 'Jakarta') {
+        // Alvin SCBD perk: +25% rent in Jakarta & Jabodetabek
+        const isJakselArea = tile.city === 'Jakarta' || tile.city === 'Jabodetabek' || tile.city === 'Tangerang' || tile.city === 'Bekasi' || tile.city === 'Depok' || tile.city === 'Bogor';
+        if (owner.characterId === 'anak_jaksel' && isJakselArea) {
           rent = Math.round(rent * 1.25);
+        }
+
+        // Tuan Tanah Betawi perk: +15% extra rent on upgraded properties
+        if (owner.characterId === 'tuan_tanah_betawi' && tile.houses > 0) {
+          rent = Math.round(rent * 1.15);
         }
 
         soundManager.playMoney();
@@ -950,6 +1008,14 @@ export default function App() {
             if (ownerIdx !== -1) next[ownerIdx].money += actualPaid;
           }
 
+          // Influencer Skincare perk: +Rp 500.000 endorsement bonus from bank
+          if (owner.characterId === 'influencer_skincare') {
+            const ownerIdx = next.findIndex((p) => p.id === owner.id);
+            if (ownerIdx !== -1) {
+              next[ownerIdx].money += 500000;
+            }
+          }
+
           // Check if money is 0 or negative: Auto-liquidate properties before bankruptcy!
           if (currP.money <= 0) {
             setTiles((prevTiles) => {
@@ -962,7 +1028,11 @@ export default function App() {
           return next;
         });
 
-        setRecentLog(`${player.name} membayar sewa ${formatRupiah(rent)} ke ${owner.name} (${tile.name}).`);
+        if (owner.characterId === 'influencer_skincare') {
+          setRecentLog(`${player.name} membayar sewa ${formatRupiah(rent)} ke ${owner.name} (${tile.name}). ✨ ${owner.name} dapat endorse Rp 500.000 dari sponsor!`);
+        } else {
+          setRecentLog(`${player.name} membayar sewa ${formatRupiah(rent)} ke ${owner.name} (${tile.name}).`);
+        }
       }
     }
   };
@@ -975,7 +1045,11 @@ export default function App() {
       return;
     }
     const tile = tiles[activePlayer.position];
-    if (tile.ownerId || activePlayer.money < tile.price) return;
+    let buyPrice = tile.price;
+    if (activePlayer.characterId === 'menteri_segala_urusan') {
+      buyPrice = Math.round(tile.price * 0.8); // Diskon PSN Menteri 20%
+    }
+    if (tile.ownerId || activePlayer.money < buyPrice) return;
 
     soundManager.playMoney();
 
@@ -983,7 +1057,7 @@ export default function App() {
       const next = [...prev];
       next[activePlayerIndex] = {
         ...next[activePlayerIndex],
-        money: next[activePlayerIndex].money - tile.price,
+        money: next[activePlayerIndex].money - buyPrice,
       };
       return next;
     });
@@ -1004,7 +1078,11 @@ export default function App() {
       });
     }
 
-    setRecentLog(`${activePlayer.name} resmi membeli kavling ${tile.name} seharga ${formatRupiah(tile.price)}!`);
+    if (activePlayer.characterId === 'menteri_segala_urusan') {
+      setRecentLog(`${activePlayer.name} membeli kavling ${tile.name} dengan Diskon PSN 20% seharga ${formatRupiah(buyPrice)}!`);
+    } else {
+      setRecentLog(`${activePlayer.name} resmi membeli kavling ${tile.name} seharga ${formatRupiah(tile.price)}!`);
+    }
   };
 
   // Upgrade Property
@@ -1015,7 +1093,11 @@ export default function App() {
       return;
     }
     const tile = tiles[tileId];
-    if (tile.ownerId !== activePlayer.id || tile.houses >= 3 || activePlayer.money < tile.housePrice) return;
+    let upgradePrice = tile.housePrice;
+    if (activePlayer.characterId === 'driver_ojol') {
+      upgradePrice = Math.round(tile.housePrice * 0.75); // Diskon Ojol 25%
+    }
+    if (tile.ownerId !== activePlayer.id || tile.houses >= 3 || activePlayer.money < upgradePrice) return;
 
     soundManager.playMoney();
 
@@ -1025,7 +1107,7 @@ export default function App() {
       const next = [...prev];
       next[activePlayerIndex] = {
         ...next[activePlayerIndex],
-        money: next[activePlayerIndex].money - tile.housePrice,
+        money: next[activePlayerIndex].money - upgradePrice,
       };
       return next;
     });
