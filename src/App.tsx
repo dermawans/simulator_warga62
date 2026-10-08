@@ -46,6 +46,7 @@ import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
 import { DiceRollOverlay, DiceOverlayState } from './components/DiceRollOverlay';
 import { FeedbackModal } from './components/FeedbackModal';
 import { CHARACTER_PRESETS } from './data/characters';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const [gameState, setGameState] = useState<'SETUP' | 'PLAYING' | 'GAME_OVER'>('SETUP');
@@ -1963,6 +1964,9 @@ export default function App() {
         roundCount={roundCount}
         multiplayerRoomCode={multiplayerRoom?.code}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
