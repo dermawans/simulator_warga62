@@ -1,7 +1,8 @@
 import React from 'react';
 import { Player, BoardTile } from '../types/game';
 import { formatRupiah } from '../utils/formatters';
-import { Siren, HelpCircle, Building } from 'lucide-react';
+import { CHARACTER_PRESETS } from '../data/characters';
+import { Siren, HelpCircle, Building, Zap } from 'lucide-react';
 
 interface PlayersOverviewBarProps {
   players: Player[];
@@ -69,9 +70,22 @@ export const PlayersOverviewBar: React.FC<PlayersOverviewBarProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">
+                  <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5 truncate">
                     {p.accessory}
                   </p>
+                  {(() => {
+                    const preset = CHARACTER_PRESETS.find((cp) => cp.id === p.characterId);
+                    if (!preset) return null;
+                    return (
+                      <div
+                        className="mt-1 inline-flex items-center gap-1 text-[9px] text-amber-900 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-300 font-bold max-w-full truncate cursor-help"
+                        title={`${preset.role}: ${preset.perkDescription}`}
+                      >
+                        <Zap className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                        <span className="truncate">{preset.title || preset.role}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

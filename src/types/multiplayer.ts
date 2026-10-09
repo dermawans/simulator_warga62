@@ -1,4 +1,4 @@
-import { Player, BoardTile } from './game';
+import { Player, BoardTile, SkillActivationInfo, EventCard } from './game';
 
 export interface RoomPlayer {
   id: string;
@@ -53,4 +53,9 @@ export type MultiplayerAction =
   | { type: 'CHAT_MESSAGE'; message: ChatMessage }
   | { type: 'TAUNT'; senderName: string; emoji: string; text?: string }
   | { type: 'PLAYER_DISCONNECTED'; playerId: string; playerName?: string }
-  | { type: 'PLAYER_TIMEOUT'; playerId: string; nextPlayerIndex: number; roundCount: number };
+  | { type: 'PLAYER_TIMEOUT'; playerId: string; nextPlayerIndex: number; roundCount: number }
+  | { type: 'SKILL_ACTIVATED'; skillEvent: SkillActivationInfo }
+  | { type: 'EVENT_CARD_DRAWN'; card: EventCard; playerIndex: number }
+  | { type: 'EVENT_CARD_CONFIRMED'; card: EventCard; playerIndex: number }
+  | { type: 'EVENT_CARD_DODGED'; playerIndex: number }
+  | { type: 'PAY_TAX'; taxAmount: number; isEvade: boolean; isBusted: boolean; playerIndex: number };

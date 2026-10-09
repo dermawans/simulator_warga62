@@ -8,12 +8,14 @@ interface EventModalProps {
   card: EventCard | null;
   player: Player;
   onConfirm: () => void;
+  canConfirm?: boolean;
 }
 
 export const EventModal: React.FC<EventModalProps> = ({
   card,
   player,
-  onConfirm
+  onConfirm,
+  canConfirm = true,
 }) => {
   const [animKey, setAnimKey] = useState<number>(0);
   const [isSpinning, setIsSpinning] = useState<boolean>(true);
@@ -250,13 +252,20 @@ export const EventModal: React.FC<EventModalProps> = ({
                     <span>Putar Ulang</span>
                   </button>
 
-                  <button
-                    onClick={onConfirm}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 active:scale-98 text-white font-black font-comic text-xs sm:text-sm uppercase tracking-wider rounded-2xl border-3 border-slate-900 comic-box-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    <Check className="w-4 h-4 text-emerald-400 stroke-3" />
-                    <span>Laksanakan & Lanjut</span>
-                  </button>
+                  {canConfirm ? (
+                    <button
+                      onClick={onConfirm}
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 active:scale-98 text-white font-black font-comic text-xs sm:text-sm uppercase tracking-wider rounded-2xl border-3 border-slate-900 comic-box-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    >
+                      <Check className="w-4 h-4 text-emerald-400 stroke-3" />
+                      <span>Laksanakan & Lanjut</span>
+                    </button>
+                  ) : (
+                    <div className="flex-1 py-3 px-4 bg-slate-800/90 text-amber-300 font-bold font-comic text-xs sm:text-sm uppercase tracking-wide rounded-2xl border-3 border-slate-900 comic-box-sm shadow-md flex items-center justify-center gap-2 select-none">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                      <span>Menunggu {player.name}...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

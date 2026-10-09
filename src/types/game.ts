@@ -93,3 +93,19 @@ export interface LeaderboardRecord {
   statusNote: string;
   date: string;
 }
+
+export interface SkillActivationInfo {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  playerColor: string;
+  characterId: string;
+  characterRole: string;
+  skillName: string;
+  skillEffect: string;
+  quote?: string;
+  bonusText?: string;
+  badgeEmoji?: string;
+  soundType?: 'fanfare' | 'money' | 'siren' | 'boing' | 'powerup';
+}

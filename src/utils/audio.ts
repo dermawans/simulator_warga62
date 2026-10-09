@@ -264,6 +264,36 @@ class SoundManager {
     osc.stop(now + 0.32);
   }
 
+  // Efek Suara Jurus / Keahlian Khusus Aktif (Rising Powerup Arpeggio & Sparkling Chime)
+  public playSkillPowerUp() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    // Fast euphoric comic powerup arpeggio: C4, E4, G4, B4, C5, E5, G5, C6
+    const notes = [261.63, 329.63, 392.00, 493.88, 523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, idx) => {
+      setTimeout(() => {
+        if (!this.ctx || this.isMuted) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = idx >= 5 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.05, this.ctx.currentTime + 0.18);
+
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.22);
+      }, idx * 42);
+    });
+  }
+
   // Efek Suara Api Menderu (Roaring Fire / Whoosh & Deep Rumble)
   public playRoaringFire() {
     if (this.isMuted) return;

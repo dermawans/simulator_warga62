@@ -1,7 +1,8 @@
 import React from 'react';
 import { Player, BoardTile } from '../types/game';
 import { formatRupiah } from '../utils/formatters';
-import { Dices, Briefcase, Zap, CheckCircle2, Siren, KeyRound, Building, HelpCircle, MapPin } from 'lucide-react';
+import { CHARACTER_PRESETS } from '../data/characters';
+import { Dices, Briefcase, Zap, CheckCircle2, Siren, KeyRound, Building, HelpCircle, MapPin, Sparkles } from 'lucide-react';
 
 interface PlayerHUDProps {
   players: Player[];
@@ -116,6 +117,30 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
         <p className="text-xs text-slate-600 italic bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/70">
           "{activePlayer.quote}"
         </p>
+
+        {/* Special Character Skill Perk Card */}
+        {(() => {
+          const activePreset = CHARACTER_PRESETS.find((cp) => cp.id === activePlayer.characterId);
+          if (!activePreset) return null;
+          return (
+            <div className="p-2.5 bg-gradient-to-r from-amber-100/90 via-yellow-50 to-amber-100/90 rounded-xl border-2 border-amber-300/80 flex items-start gap-2 shadow-2xs">
+              <span className="text-base shrink-0 animate-bounce">⚡</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase font-black font-comic text-amber-950 tracking-wider">
+                    Keahlian Khusus: {activePreset.role}
+                  </span>
+                  <span className="text-[9px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.2 rounded font-mono">
+                    PASIF/AKTIF
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-950 font-medium leading-snug mt-0.5">
+                  {activePreset.perkDescription}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Current Location Petak */}
         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">

@@ -5,7 +5,8 @@ import {
   BoardTile,
   EconomicCondition,
   EventCard,
-  LeaderboardRecord
+  LeaderboardRecord,
+  SkillActivationInfo
 } from './types/game';
 import { INITIAL_BOARD_TILES, UPGRADE_TIERS } from './data/boardTiles';
 import {
@@ -45,6 +46,7 @@ import { multiplayerService } from './services/multiplayer';
 import { RoomState, ChatMessage, RoomPlayer } from './types/multiplayer';
 import { DiceRollOverlay, DiceOverlayState } from './components/DiceRollOverlay';
 import { FeedbackModal } from './components/FeedbackModal';
+import { SkillActivationOverlay } from './components/SkillActivationOverlay';
 import { CHARACTER_PRESETS } from './data/characters';
 
 export default function App() {
@@ -76,6 +78,7 @@ export default function App() {
   const [doubleRollCount, setDoubleRollCount] = useState<number>(0);
   const [hasDoubleRollBonus, setHasDoubleRollBonus] = useState<boolean>(false);
   const [turnTimeLeft, setTurnTimeLeft] = useState<number>(60);
+  const [activeSkillOverlay, setActiveSkillOverlay] = useState<SkillActivationInfo | null>(null);
   const [recentLog, setRecentLog] = useState<string>('Selamat datang di Simulator Warga62!');
   const [arisanPot, setArisanPot] = useState<number>(6500000);
   const [roundCount, setRoundCount] = useState<number>(1);
@@ -99,6 +102,7 @@ export default function App() {
   const [taxModalOpen, setTaxModalOpen] = useState(false);
   const [karmaModalPlayer, setKarmaModalPlayer] = useState<Player | null>(null);
   const [eventCard, setEventCard] = useState<EventCard | null>(null);
+  const pendingEventCardRef = useRef<EventCard | null>(null);
   const [viralNews, setViralNews] = useState<{
     player: Player;
     data: {
@@ -141,6 +145,7 @@ export default function App() {
   const isOnlineMode = !!multiplayerRoom;
   const isMyTurnOnline = !isOnlineMode || (activePlayer !== null && activePlayer.id === currentMyId);
   const myOnlinePlayer = isOnlineMode ? players.find((p) => p.id === currentMyId) || null : null;
+  const isHost = !multiplayerRoom || (multiplayerRoom.hostId === currentMyId);
 
   // Calculate Net Worth for a player
   const calculateNetWorth = (p: Player) => {
@@ -374,11 +379,51 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [multiplayerRoom, gameState]);
 
+  // Trigger Dynamic Character Skill Activation Effect
+  const triggerSkillActivation = (
+    player: Player,
+    skillData: {
+      skillName: string;
+      skillEffect: string;
+      bonusText?: string;
+      badgeEmoji?: string;
+      soundType?: 'fanfare' | 'money' | 'siren' | 'boing' | 'powerup';
+    }
+  ) => {
+    const preset = CHARACTER_PRESETS.find((p) => p.id === player.characterId);
+    const info: SkillActivationInfo = {
+      id: `skill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      playerId: player.id,
+      playerName: player.name,
+      playerAvatar: player.avatarEmoji,
+      playerColor: player.color,
+      characterId: player.characterId,
+      characterRole: preset?.role || 'Warga Satir',
+      skillName: skillData.skillName,
+      skillEffect: skillData.skillEffect,
+      quote: preset?.quote,
+      bonusText: skillData.bonusText,
+      badgeEmoji: skillData.badgeEmoji,
+      soundType: skillData.soundType || 'powerup',
+    };
+
+    setActiveSkillOverlay(info);
+
+    // Broadcast in multiplayer so all room members see the effect
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'SKILL_ACTIVATED',
+        skillEvent: info,
+      });
+    }
+  };
+
   // Remote Multiplayer Listeners
   useEffect(() => {
     const unsubAction = multiplayerService.onGameAction((action, senderId) => {
       switch (action.type) {
         case 'ROLL_DICE': {
+          pendingEventCardRef.current = null;
           soundManager.playDiceRoll();
           const validDice: [number, number] =
             Array.isArray(action.dice) &&
@@ -571,7 +616,17 @@ export default function App() {
           } else {
             soundManager.playMoney();
             let gain = scheme.reward;
-            if (players[pIdx].characterId === 'pejabat') gain = Math.round(gain * 1.2);
+            if (players[pIdx].characterId === 'pejabat') {
+              const bonusCuan = Math.round(gain * 0.2);
+              gain += bonusCuan;
+              triggerSkillActivation(players[pIdx], {
+                skillName: 'Koneksi Tender Dinas',
+                skillEffect: 'Korupsi SPJ dinas menghasilkan cuan +20% lebih banyak berkat lobi birokrasi!',
+                bonusText: `+${formatRupiah(bonusCuan)}`,
+                badgeEmoji: '🧔🏻‍♂️',
+                soundType: 'money',
+              });
+            }
             setPlayers((prev) => {
               const next = [...prev];
               next[pIdx] = {
@@ -596,6 +651,13 @@ export default function App() {
           // Target is immune if Siti Hacker (programmer_scam)
           if (players[targetIdx].characterId === 'programmer_scam') {
             soundManager.playBoing();
+            triggerSkillActivation(players[targetIdx], {
+              skillName: 'Firewall Anti-Hacking',
+              skillEffect: 'KEBAL SABOTASE! Serangan teror bisnis lawan berhasil dimentalkan tanpa kerugian!',
+              bonusText: 'KEBAL SABOTASE 🛡️',
+              badgeEmoji: '👩🏻‍💻',
+              soundType: 'boing',
+            });
             setRecentLog(`🛡️ Sabotase Gagal! ${players[targetIdx].name} (Siti Hacker) kebal sabotase lawan!`);
             break;
           }
@@ -642,6 +704,77 @@ export default function App() {
           setRoundCount(action.roundCount);
           setArisanPot(action.arisanPot);
           setEconomicIndex(action.economicIndex);
+          break;
+        }
+
+        case 'SKILL_ACTIVATED': {
+          setActiveSkillOverlay(action.skillEvent);
+          break;
+        }
+
+        case 'EVENT_CARD_DRAWN': {
+          pendingEventCardRef.current = action.card;
+          if (!isHopping) {
+            setEventCard(action.card);
+          }
+          break;
+        }
+
+        case 'EVENT_CARD_DODGED': {
+          pendingEventCardRef.current = null;
+          setEventCard(null);
+          break;
+        }
+
+        case 'EVENT_CARD_CONFIRMED': {
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = action.playerIndex;
+            if (pIdx >= 0 && pIdx < next.length) {
+              const curr = { ...next[pIdx] };
+              const moneyToAdd = action.card.id === 'win_arisan' ? 0 : action.card.moneyChange;
+              curr.money = Math.max(0, curr.money + moneyToAdd);
+              curr.karma = Math.max(0, Math.min(100, curr.karma + action.card.karmaChange));
+              if (action.card.goToJail) {
+                curr.inJail = true;
+                curr.jailTurns = 3;
+                curr.position = 24; // Lapas Sukamiskin
+              }
+              next[pIdx] = curr;
+            }
+            return next;
+          });
+          setRecentLog(`${players[action.playerIndex]?.name || 'Pemain'} menyelesaikan event: ${action.card.title}`);
+          setEventCard(null);
+          pendingEventCardRef.current = null;
+          break;
+        }
+
+        case 'PAY_TAX': {
+          setPlayers((prev) => {
+            const next = [...prev];
+            const pIdx = action.playerIndex;
+            if (pIdx >= 0 && pIdx < next.length) {
+              const curr = { ...next[pIdx] };
+              curr.money = Math.max(0, curr.money - action.taxAmount);
+              curr.totalTaxesPaid += action.taxAmount;
+              if (action.isEvade) {
+                if (action.isBusted) {
+                  curr.inJail = true;
+                  curr.jailTurns = 3;
+                  curr.position = 24;
+                  curr.karma = 10;
+                } else {
+                  curr.karma = Math.min(100, curr.karma + 25);
+                }
+              } else {
+                curr.karma = Math.max(0, curr.karma - 15);
+              }
+              next[pIdx] = curr;
+            }
+            return next;
+          });
+          setTaxModalOpen(false);
           break;
         }
       }
@@ -711,6 +844,20 @@ export default function App() {
     setGameState('PLAYING');
     setHasRolled(false);
     setRecentLog(`Permainan dimulai! Giliran pertama: ${configuredPlayers[0].name}.`);
+
+    // Check if any player has Bos Pinjol starting perk
+    const pinjol = configuredPlayers.find((p) => p.characterId === 'bos_pinjol');
+    if (pinjol) {
+      setTimeout(() => {
+        triggerSkillActivation(pinjol, {
+          skillName: 'Dana Segar Bos Pinjol',
+          skillEffect: 'Memulai permainan dengan modal kas awal ekstra Rp 5.000.000 (total modal awal Rp 25 Juta)!',
+          bonusText: '+Rp 5.000.000 💵',
+          badgeEmoji: '🤑',
+          soundType: 'money',
+        });
+      }, 700);
+    }
   };
 
   // Start game from online multiplayer lobby
@@ -753,6 +900,20 @@ export default function App() {
     setHasRolled(false);
     setGameOverData(null);
     setRecentLog(`🌐 Permainan Mabar Online dimulai di Room ${room.code}!`);
+
+    // Check if any player has Bos Pinjol starting perk
+    const pinjol = onlinePlayers.find((p) => p.characterId === 'bos_pinjol');
+    if (pinjol) {
+      setTimeout(() => {
+        triggerSkillActivation(pinjol, {
+          skillName: 'Dana Segar Bos Pinjol',
+          skillEffect: 'Memulai permainan dengan modal kas awal ekstra Rp 5.000.000 (total modal awal Rp 25 Juta)!',
+          bonusText: '+Rp 5.000.000 💵',
+          badgeEmoji: '🤑',
+          soundType: 'money',
+        });
+      }, 800);
+    }
   };
 
   // Roll Dice & Move
@@ -879,6 +1040,13 @@ export default function App() {
         if (activePlayer.characterId === 'mahasiswa_demo' || activePlayer.characterId === 'mahasiswa') {
           bonus += 2500000; // Mahasiswa perk (Tunjangan Magang)
           subNote = 'Termasuk Tunjangan Magang Mahasiswa';
+          triggerSkillActivation(activePlayer, {
+            skillName: 'Tunjangan Magang Mahasiswa',
+            skillEffect: 'Menerima ekstra tunjangan hidup +Rp 2.500.000 saat melintasi petak START!',
+            bonusText: '+Rp 2.500.000 🎓',
+            badgeEmoji: '🧑🏻‍🎓',
+            soundType: 'money',
+          });
         }
         if (accumulatedMoney < 3000000) {
           bonus += 2000000; // Bansos Warga Miskin
@@ -996,7 +1164,15 @@ export default function App() {
 
       let jackpot = arisanPot;
       if (player.characterId === 'bandar_arisan') {
-        jackpot = Math.round(jackpot * 1.25);
+        const arisanBonus = Math.round(jackpot * 0.25);
+        jackpot += arisanBonus;
+        triggerSkillActivation(player, {
+          skillName: 'Kocokan Bandar Sakti',
+          skillEffect: 'Sebagai Bandar Arisan, Anda mendapat ekstra bonus cuan +25% dari seluruh kas warga!',
+          bonusText: `+${formatRupiah(arisanBonus)} BONUS 🎁`,
+          badgeEmoji: '💃🏻',
+          soundType: 'fanfare',
+        });
       }
 
       setPlayers((prev) => {
@@ -1016,16 +1192,26 @@ export default function App() {
         setRecentLog(`🎉 SELAMAT! ${player.name} menang arisan warga RT senilai ${formatRupiah(jackpot)}!`);
       }
 
-      setEventCard({
+      const arisanCard: EventCard = {
         id: 'win_arisan',
         title: player.characterId === 'bandar_arisan' ? 'MENANG ARISAN + BONUS BANDAR! 🎁' : 'MENANG ARISAN WARGA RT! 🎁',
         category: 'ARISAN',
         description: 'Nama Anda keluar dari kocokan gelas arisan emak-emak komplek! Seluruh kas warga diserahkan kepada Anda.',
         effectDescription: `Uang tunai kas arisan bertambah +${formatRupiah(jackpot)}.`,
-        moneyChange: jackpot,
-        karmaChange: -10,
+        moneyChange: 0,
+        karmaChange: 0,
         isJackpot: true,
-      });
+      };
+      setEventCard(arisanCard);
+      pendingEventCardRef.current = arisanCard;
+
+      if (multiplayerRoom) {
+        multiplayerService.sendAction({
+          type: 'EVENT_CARD_DRAWN',
+          card: arisanCard,
+          playerIndex: activePlayerIndex,
+        });
+      }
       return;
     }
 
@@ -1033,24 +1219,44 @@ export default function App() {
       // Kantor Pajak Progresif
       soundManager.playGavel();
       if (!player.isBot) {
-        setTaxModalOpen(true);
-      } else {
-        // Bot auto honest tax
-        const netWorth = calculateNetWorth(player);
-        let taxAmount = Math.round(netWorth * 0.03);
-        if (player.characterId === 'emak_matic') {
-          taxAmount = Math.round(taxAmount * 0.5);
+        if (!multiplayerRoom || currentMyId === player.id) {
+          setTaxModalOpen(true);
         }
-        setPlayers((prev) => {
-          const next = [...prev];
-          next[activePlayerIndex] = {
-            ...next[activePlayerIndex],
-            money: Math.max(0, next[activePlayerIndex].money - taxAmount),
-            totalTaxesPaid: next[activePlayerIndex].totalTaxesPaid + taxAmount,
-          };
-          return next;
-        });
-        setRecentLog(`${player.name} membayar pajak SPT sebesar ${formatRupiah(taxAmount)}.`);
+      } else {
+        // Bot auto honest tax (only host executes for bots in multiplayer)
+        if (!multiplayerRoom || isHost) {
+          const netWorth = calculateNetWorth(player);
+          let taxAmount = Math.round(netWorth * 0.03);
+          if (player.characterId === 'emak_matic') {
+            taxAmount = Math.round(taxAmount * 0.5);
+            triggerSkillActivation(player, {
+              skillName: 'Lobi Emak-Emak Matic',
+              skillEffect: 'Diskon 50% pajak SPT tahunan lewat jurus tawar-menawar!',
+              bonusText: 'DISKON 50%',
+              badgeEmoji: '🧕🏼',
+              soundType: 'money',
+            });
+          }
+          setPlayers((prev) => {
+            const next = [...prev];
+            next[activePlayerIndex] = {
+              ...next[activePlayerIndex],
+              money: Math.max(0, next[activePlayerIndex].money - taxAmount),
+              totalTaxesPaid: next[activePlayerIndex].totalTaxesPaid + taxAmount,
+            };
+            return next;
+          });
+          setRecentLog(`${player.name} membayar pajak SPT sebesar ${formatRupiah(taxAmount)}.`);
+          if (multiplayerRoom) {
+            multiplayerService.sendAction({
+              type: 'PAY_TAX',
+              taxAmount,
+              isEvade: false,
+              isBusted: false,
+              playerIndex: activePlayerIndex,
+            });
+          }
+        }
       }
       return;
     }
@@ -1060,6 +1266,13 @@ export default function App() {
       if (player.characterId === 'preman_parkir') {
         soundManager.playMoney();
         const setoran = 1000000;
+        triggerSkillActivation(player, {
+          skillName: 'Prit-Prit Setoran Parkir',
+          skillEffect: 'Mengutip uang kas parkir liar Rp 1.000.000 dari kas warga bukannya membayar!',
+          bonusText: '+Rp 1.000.000 🧢',
+          badgeEmoji: '🧢',
+          soundType: 'money',
+        });
         setPlayers((prev) => {
           const next = [...prev];
           next[activePlayerIndex] = {
@@ -1088,14 +1301,39 @@ export default function App() {
     }
 
     if (tile.type === 'event' || tileIndex === 20) {
-      // Emak-Emak Matic perk: 50% chance to dodge razia police raid
-      if (tileIndex === 20 && player.characterId === 'emak_matic' && Math.random() < 0.5) {
-        soundManager.playFanfare();
-        setRecentLog(`🧕🏼 Sen Kiri Belok Kanan! ${player.name} berhasil lolos dari razia polisi lalu lintas tanpa kena tilang!`);
+      const isAuthoritative =
+        !multiplayerRoom || currentMyId === player.id || (player.isBot && isHost);
+
+      if (!isAuthoritative) {
+        // Remote multiplayer observer: do not roll an independent card!
+        // Display card received from the active player who drew it
+        if (pendingEventCardRef.current) {
+          setEventCard(pendingEventCardRef.current);
+        }
         return;
       }
 
-      // Random Event Card
+      // Emak-Emak Matic perk: 50% chance to dodge razia police raid
+      if (tileIndex === 20 && player.characterId === 'emak_matic' && Math.random() < 0.5) {
+        soundManager.playFanfare();
+        triggerSkillActivation(player, {
+          skillName: 'Sen Kiri Belok Kanan',
+          skillEffect: 'Lolos dari Razia Polisi Lalu Lintas tanpa ditilang berkat kepiawaian emak-emak!',
+          bonusText: 'BEBAS TILANG 🛡️',
+          badgeEmoji: '🧕🏼',
+          soundType: 'fanfare',
+        });
+        setRecentLog(`🧕🏼 Sen Kiri Belok Kanan! ${player.name} berhasil lolos dari razia polisi lalu lintas tanpa kena tilang!`);
+        if (multiplayerRoom) {
+          multiplayerService.sendAction({
+            type: 'EVENT_CARD_DODGED',
+            playerIndex: activePlayerIndex,
+          });
+        }
+        return;
+      }
+
+      // Random Event Card drawn by the active player / host
       let cardList = NASIB_CARDS;
       if (tileIndex === 20) {
         cardList = RAZIA_CARDS;
@@ -1104,6 +1342,15 @@ export default function App() {
       }
       const randomCard = cardList[Math.floor(Math.random() * cardList.length)];
       setEventCard(randomCard);
+      pendingEventCardRef.current = randomCard;
+
+      if (multiplayerRoom) {
+        multiplayerService.sendAction({
+          type: 'EVENT_CARD_DRAWN',
+          card: randomCard,
+          playerIndex: activePlayerIndex,
+        });
+      }
       return;
     }
 
@@ -1118,17 +1365,40 @@ export default function App() {
         // Pak RT perk: 30% discount
         if (player.characterId === 'lurah_kumis') {
           rent = Math.round(rent * 0.7);
+          triggerSkillActivation(player, {
+            skillName: 'Koneksi Warga RT',
+            skillEffect: 'Mendapat potongan sewa 30% berkat lobi rukun tetangga Pak RT!',
+            bonusText: 'HEMAT 30% 👨🏻‍🦳',
+            badgeEmoji: '👨🏻‍🦳',
+            soundType: 'powerup',
+          });
         }
 
         // Alvin SCBD perk: +25% rent in Jakarta & Jabodetabek
         const isJakselArea = tile.city === 'Jakarta' || tile.city === 'Jabodetabek' || tile.city === 'Tangerang' || tile.city === 'Bekasi' || tile.city === 'Depok' || tile.city === 'Bogor';
         if (owner.characterId === 'anak_jaksel' && isJakselArea) {
-          rent = Math.round(rent * 1.25);
+          const extraJaksel = Math.round(rent * 0.25);
+          rent += extraJaksel;
+          triggerSkillActivation(owner, {
+            skillName: 'Gaya Hidup Senoparty',
+            skillEffect: 'Tarif sewa naik +25% karena properti berada di kawasan elit Jabodetabek!',
+            bonusText: `+${formatRupiah(extraJaksel)} ☕`,
+            badgeEmoji: '👱🏼‍♂️',
+            soundType: 'money',
+          });
         }
 
         // Tuan Tanah Betawi perk: +15% extra rent on upgraded properties
         if (owner.characterId === 'tuan_tanah_betawi' && tile.houses > 0) {
-          rent = Math.round(rent * 1.15);
+          const extraBetawi = Math.round(rent * 0.15);
+          rent += extraBetawi;
+          triggerSkillActivation(owner, {
+            skillName: 'Juragan Kontrakan 100 Pintu',
+            skillEffect: 'Tarif sewa properti hasil renovasi bertambah ekstra +15%!',
+            bonusText: `+${formatRupiah(extraBetawi)} 🧓🏾`,
+            badgeEmoji: '🧓🏾',
+            soundType: 'money',
+          });
         }
 
         soundManager.playMoney();
@@ -1160,6 +1430,13 @@ export default function App() {
             const ownerIdx = next.findIndex((p) => p.id === owner.id);
             if (ownerIdx !== -1) {
               next[ownerIdx].money += 500000;
+              triggerSkillActivation(owner, {
+                skillName: 'Endorse Sultan Glowing',
+                skillEffect: 'Menerima fee endorse Rp 500.000 dari brand kecantikan karena ada tamu mendarat!',
+                bonusText: '+Rp 500.000 ✨',
+                badgeEmoji: '✨',
+                soundType: 'money',
+              });
             }
           }
 
@@ -1195,6 +1472,13 @@ export default function App() {
     let buyPrice = tile.price;
     if (activePlayer.characterId === 'menteri_segala_urusan') {
       buyPrice = Math.round(tile.price * 0.8); // Diskon PSN Menteri 20%
+      triggerSkillActivation(activePlayer, {
+        skillName: 'Proyek Strategis Nasional',
+        skillEffect: 'Mendapat diskon PSN 20% saat membeli kavling properti baru atau aset BUMN!',
+        bonusText: 'DISKON 20% 🎖️',
+        badgeEmoji: '🎖️',
+        soundType: 'powerup',
+      });
     }
     if (tile.ownerId || activePlayer.money < buyPrice) return;
 
@@ -1243,6 +1527,13 @@ export default function App() {
     let upgradePrice = tile.housePrice;
     if (activePlayer.characterId === 'driver_ojol') {
       upgradePrice = Math.round(tile.housePrice * 0.75); // Diskon Ojol 25%
+      triggerSkillActivation(activePlayer, {
+        skillName: 'Koneksi Tukang Borongan',
+        skillEffect: 'Diskon 25% biaya renovasi properti berkat relasi tukang pangkalan ojol!',
+        bonusText: 'HEMAT 25% 🛵',
+        badgeEmoji: '🛵',
+        soundType: 'powerup',
+      });
     }
     if (tile.ownerId !== activePlayer.id || tile.houses >= 3 || activePlayer.money < upgradePrice) return;
 
@@ -1403,7 +1694,15 @@ export default function App() {
       // Got away with it!
       let gain = scheme.reward;
       if (activePlayer.characterId === 'pejabat') {
-        gain = Math.round(gain * 1.2); // Pejabat perk: +20%
+        const bonusPejabat = Math.round(gain * 0.2);
+        gain += bonusPejabat; // Pejabat perk: +20%
+        triggerSkillActivation(activePlayer, {
+          skillName: 'Koneksi Tender Dinas',
+          skillEffect: 'Korupsi SPJ dinas menghasilkan cuan +20% lebih banyak berkat lobi birokrasi!',
+          bonusText: `+${formatRupiah(bonusPejabat)} 💰`,
+          badgeEmoji: '🧔🏻‍♂️',
+          soundType: 'money',
+        });
       }
 
       setPlayers((prev) => {
@@ -1432,6 +1731,30 @@ export default function App() {
     }
     const targetPlayer = players.find((p) => p.id === targetPlayerId);
     if (!targetPlayer) return;
+
+    // Check if target is Siti Hacker (programmer_scam)
+    if (targetPlayer.characterId === 'programmer_scam') {
+      soundManager.playBoing();
+      triggerSkillActivation(targetPlayer, {
+        skillName: 'Firewall Anti-Hacking',
+        skillEffect: 'KEBAL SABOTASE! Serangan teror bisnis lawan berhasil dimentalkan tanpa kerugian!',
+        bonusText: 'KEBAL SABOTASE 🛡️',
+        badgeEmoji: '👩🏻‍💻',
+        soundType: 'boing',
+      });
+      setRecentLog(`🛡️ Sabotase Gagal! ${targetPlayer.name} (Siti Hacker) kebal terhadap sabotase lawan!`);
+      return;
+    }
+
+    if (activePlayer.characterId === 'programmer_scam') {
+      triggerSkillActivation(activePlayer, {
+        skillName: 'Bypass Server Darkweb',
+        skillEffect: 'Diskon biaya sabotase Rp 1.000.000 dengan exploit script otomatis!',
+        bonusText: 'HEMAT Rp 1.000.000 💻',
+        badgeEmoji: '👩🏻‍💻',
+        soundType: 'powerup',
+      });
+    }
 
     if (multiplayerRoom) {
       multiplayerService.sendAction({
@@ -1502,10 +1825,15 @@ export default function App() {
   const handleConfirmEventCard = () => {
     if (!eventCard || !activePlayer) return;
 
+    if (multiplayerRoom && currentMyId !== activePlayer.id && !(activePlayer.isBot && isHost)) {
+      return;
+    }
+
     setPlayers((prev) => {
       const next = [...prev];
       const curr = next[activePlayerIndex];
-      let newMoney = curr.money + eventCard.moneyChange;
+      const moneyToAdd = eventCard.id === 'win_arisan' ? 0 : eventCard.moneyChange;
+      let newMoney = curr.money + moneyToAdd;
       let newKarma = Math.max(0, Math.min(100, curr.karma + eventCard.karmaChange));
 
       curr.money = Math.max(0, newMoney);
@@ -1521,13 +1849,33 @@ export default function App() {
     });
 
     setRecentLog(`${activePlayer.name} menyelesaikan event: ${eventCard.title}`);
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'EVENT_CARD_CONFIRMED',
+        card: eventCard,
+        playerIndex: activePlayerIndex,
+      });
+    }
+
     setEventCard(null);
+    pendingEventCardRef.current = null;
   };
 
   // Honest tax payment
   const handlePayHonestTax = (taxAmount: number) => {
     if (!activePlayer) return;
     setTaxModalOpen(false);
+
+    if (activePlayer.characterId === 'emak_matic') {
+      triggerSkillActivation(activePlayer, {
+        skillName: 'Lobi Emak-Emak Matic',
+        skillEffect: 'Diskon 50% pembayaran SPT pajak progresif lewat keahlian menawar!',
+        bonusText: 'HEMAT 50% 🧕🏼',
+        badgeEmoji: '🧕🏼',
+        soundType: 'money',
+      });
+    }
 
     setPlayers((prev) => {
       const next = [...prev];
@@ -1539,6 +1887,16 @@ export default function App() {
     });
 
     setRecentLog(`${activePlayer.name} membayar SPT resmi ${formatRupiah(taxAmount)}. Karma berkurang!`);
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'PAY_TAX',
+        taxAmount,
+        isEvade: false,
+        isBusted: false,
+        playerIndex: activePlayerIndex,
+      });
+    }
   };
 
   // Evade tax
@@ -1556,21 +1914,43 @@ export default function App() {
     });
 
     setRecentLog(`${activePlayer.name} memakai pembukuan ganda bawah meja! Karma risiko naik +25%.`);
+
+    if (multiplayerRoom) {
+      multiplayerService.sendAction({
+        type: 'PAY_TAX',
+        taxAmount: bribeAmount,
+        isEvade: true,
+        isBusted: false,
+        playerIndex: activePlayerIndex,
+      });
+    }
   };
 
   // Pay Bail out of Sukamiskin
   const handlePayBail = () => {
-    if (!activePlayer || activePlayer.money < 2500000) return;
+    const isHotmam = activePlayer?.characterId === 'pengacara_sultan';
+    const bailCost = isHotmam ? 1250000 : 2500000;
+    if (!activePlayer || activePlayer.money < bailCost) return;
     if (isOnlineMode && !isMyTurnOnline) {
       soundManager.playBoing();
       return;
     }
     soundManager.playMoney();
 
+    if (isHotmam) {
+      triggerSkillActivation(activePlayer, {
+        skillName: 'Lobi Hukum Hotmam',
+        skillEffect: 'Diskon 50% uang damai sipir Sukamiskin (cukup Rp 1.250.000) dan langsung bebas seketika!',
+        bonusText: 'HEMAT 50% ⚖️',
+        badgeEmoji: '⚖️',
+        soundType: 'fanfare',
+      });
+    }
+
     setPlayers((prev) => {
       const next = [...prev];
       const curr = next[activePlayerIndex];
-      curr.money -= 2500000;
+      curr.money -= bailCost;
       curr.inJail = false;
       curr.jailTurns = 0;
       return next;
@@ -1579,11 +1959,11 @@ export default function App() {
     if (multiplayerRoom) {
       multiplayerService.sendAction({
         type: 'PAY_BAIL',
-        amount: 2500000,
+        amount: bailCost,
       });
     }
 
-    setRecentLog(`${activePlayer.name} menyetor uang damai Rp 2.500.000 dan bebas dari Sukamiskin!`);
+    setRecentLog(`${activePlayer.name} menyetor uang damai ${formatRupiah(bailCost)} dan bebas dari Sukamiskin!`);
   };
 
   // Donate Charity to reduce Karma
@@ -1592,19 +1972,32 @@ export default function App() {
     const targetIdx = players.findIndex((p) => p.id === karmaModalPlayer.id);
     if (targetIdx === -1 || players[targetIdx].money < 2000000) return;
 
+    const isUstadz = karmaModalPlayer.characterId === 'ustadz_kondang';
+    const karmaReduction = isUstadz ? 30 : 15;
+
+    if (isUstadz) {
+      triggerSkillActivation(karmaModalPlayer, {
+        skillName: 'Sedekah Penggugur Dosa',
+        skillEffect: 'Pahala berlipat! Karma KPK berkurang 2x lebih banyak (-30%)!',
+        bonusText: '-30% KARMA 🕊️',
+        badgeEmoji: '👳🏽‍♂️',
+        soundType: 'fanfare',
+      });
+    }
+
     setPlayers((prev) => {
       const next = [...prev];
       next[targetIdx] = {
         ...next[targetIdx],
         money: next[targetIdx].money - 2000000,
-        karma: Math.max(0, next[targetIdx].karma - 15),
+        karma: Math.max(0, next[targetIdx].karma - karmaReduction),
       };
       setKarmaModalPlayer(next[targetIdx]);
       return next;
     });
 
     setArisanPot((prev) => prev + 1000000);
-    setRecentLog(`🕊️ ${karmaModalPlayer.name} bersedekah Rp 2.000.000 ke kas warga! Dosa Karma berkurang -15%.`);
+    setRecentLog(`🕊️ ${karmaModalPlayer.name} bersedekah Rp 2.000.000 ke kas warga! Dosa Karma berkurang -${karmaReduction}%.`);
   };
 
   // Trigger Game Over with reason, celebration fanfare, and leaderboard
@@ -1986,6 +2379,7 @@ export default function App() {
           card={eventCard}
           player={activePlayer}
           onConfirm={handleConfirmEventCard}
+          canConfirm={!multiplayerRoom || currentMyId === activePlayer.id || (activePlayer.isBot && isHost)}
         />
       )}
 
@@ -2092,6 +2486,12 @@ export default function App() {
         currentUserName={activePlayer?.name || 'Warga 62'}
         roundCount={roundCount}
         multiplayerRoomCode={multiplayerRoom?.code}
+      />
+
+      {/* 18. Special Character Skill Activation Overlay */}
+      <SkillActivationOverlay
+        info={activeSkillOverlay}
+        onDismiss={() => setActiveSkillOverlay(null)}
       />
     </div>
   );
