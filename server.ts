@@ -175,8 +175,19 @@ async function startServer() {
               rooms.set(roomCode, room);
             }
 
-            // Check if room is full
+            // Check if game has already started (block outsiders from joining ongoing match)
             const existingPlayerIndex = room.players.findIndex((p) => p.id === player.id);
+            if (existingPlayerIndex === -1 && room.status !== 'LOBBY') {
+              ws.send(
+                JSON.stringify({
+                  type: 'ERROR',
+                  payload: { message: `Permainan di Room ${roomCode} sudah dimulai. Pemain baru tidak dapat bergabung ke match yang sedang berjalan.` },
+                })
+              );
+              return;
+            }
+
+            // Check if room is full
             if (existingPlayerIndex === -1 && room.players.length >= room.maxPlayers) {
               ws.send(
                 JSON.stringify({
@@ -303,7 +314,13 @@ async function startServer() {
           }
 
           case 'CHAT_MESSAGE': {
-            if (!meta.roomId) return;
+            if (!meta.roomId || !meta.playerId) return;
+            const room = rooms.get(meta.roomId);
+            if (!room) return;
+            // Only verified members of the room can send chat messages
+            const isMember = room.players.some((p) => p.id === meta.playerId);
+            if (!isMember) return;
+
             broadcastToRoom(meta.roomId, {
               type: 'CHAT_MESSAGE',
               payload: {
@@ -331,6 +348,17 @@ async function startServer() {
           const player = room.players.find((p) => p.id === meta.playerId);
           if (player) {
             player.connected = false;
+            // If playing, broadcast disconnection so other players know they went AFK/bankrupt
+            if (room.status === 'PLAYING') {
+              broadcastToRoom(meta.roomId, {
+                type: 'PLAYER_DISCONNECTED',
+                payload: {
+                  playerId: meta.playerId,
+                  playerName: player.name,
+                },
+              });
+            }
+
             // If in lobby and player disconnects, remove them; if playing, keep slot
             if (room.status === 'LOBBY') {
               room.players = room.players.filter((p) => p.id !== meta.playerId);

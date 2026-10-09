@@ -27,6 +27,8 @@ interface PlayerHUDProps {
   isOnlineMode?: boolean;
   isMyTurnOnline?: boolean;
   myOnlinePlayer?: Player | null;
+  isDoubleRoll?: boolean;
+  turnTimeLeft?: number;
 }
 
 export const PlayerHUD: React.FC<PlayerHUDProps> = ({
@@ -52,6 +54,8 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
   isOnlineMode = false,
   isMyTurnOnline = true,
   myOnlinePlayer = null,
+  isDoubleRoll = false,
+  turnTimeLeft = 60,
 }) => {
   const isHighKarma = activePlayer.karma >= 60;
   const isMyTurn = !isOnlineMode || isMyTurnOnline;
@@ -309,13 +313,36 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
               </div>
             )}
 
+            {/* 60s Turn Timeout Countdown Display */}
+            {turnTimeLeft !== undefined && (
+              <div
+                className={`p-2 px-3 rounded-xl border-2 flex items-center justify-between text-xs font-comic font-bold shadow-2xs transition-colors ${
+                  turnTimeLeft <= 15
+                    ? 'bg-rose-100 border-rose-500 text-rose-950 animate-pulse'
+                    : turnTimeLeft <= 30
+                    ? 'bg-amber-100 border-amber-400 text-amber-950'
+                    : 'bg-slate-100 border-slate-300 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">⏱️</span>
+                  <span>Waktu Giliran {isMyTurn ? '(Anda)' : `(${activePlayer.name.split(' ')[0]})`}:</span>
+                </div>
+                <span className={`font-mono font-black text-sm ${turnTimeLeft <= 15 ? 'text-rose-600' : 'text-slate-900'}`}>
+                  {turnTimeLeft}s
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => onRollDice()}
                 disabled={!canRoll || isRolling || activePlayer.isBot || !isMyTurn}
                 className={`py-3 px-3 rounded-xl font-black text-xs uppercase tracking-wider comic-box-sm comic-btn-hover flex items-center justify-center gap-1.5 ${
                   canRoll && !isRolling && !activePlayer.isBot && isMyTurn
-                    ? 'bg-amber-400 hover:bg-amber-500 text-slate-950 cursor-pointer'
+                    ? isDoubleRoll
+                      ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-slate-950 ring-2 ring-yellow-400 cursor-pointer shadow-md'
+                      : 'bg-amber-400 hover:bg-amber-500 text-slate-950 cursor-pointer'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                 }`}
               >
@@ -324,6 +351,8 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
                   ? 'Mengocok Dadu...'
                   : isHopping && diceRoll
                   ? `Maju ${diceRoll[0] + diceRoll[1]} Petak!`
+                  : isDoubleRoll
+                  ? '🎲 Kocok Lagi! (Kembar ✨)'
                   : !isMyTurn
                   ? 'Tunggu Giliran'
                   : 'Kocok Dadu!'}

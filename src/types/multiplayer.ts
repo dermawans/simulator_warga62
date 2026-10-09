@@ -51,4 +51,6 @@ export type MultiplayerAction =
   | { type: 'SABOTAGE'; targetPlayerId: string; skillId: string }
   | { type: 'FULL_STATE_SYNC'; players: Player[]; tiles: BoardTile[]; activePlayerIndex: number; roundCount: number; arisanPot: number; economicIndex: number }
   | { type: 'CHAT_MESSAGE'; message: ChatMessage }
-  | { type: 'TAUNT'; senderName: string; emoji: string; text?: string };
+  | { type: 'TAUNT'; senderName: string; emoji: string; text?: string }
+  | { type: 'PLAYER_DISCONNECTED'; playerId: string; playerName?: string }
+  | { type: 'PLAYER_TIMEOUT'; playerId: string; nextPlayerIndex: number; roundCount: number };

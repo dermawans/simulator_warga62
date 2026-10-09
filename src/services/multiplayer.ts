@@ -7,6 +7,7 @@ type GameActionListener = (action: MultiplayerAction, senderId: string) => void;
 type ChatListener = (message: ChatMessage) => void;
 type ErrorListener = (message: string) => void;
 type StatusListener = (connected: boolean) => void;
+type PlayerDisconnectListener = (playerId: string, playerName?: string) => void;
 
 class MultiplayerService {
   private ws: WebSocket | null = null;
@@ -28,6 +29,7 @@ class MultiplayerService {
   private chatListeners: Set<ChatListener> = new Set();
   private errorListeners: Set<ErrorListener> = new Set();
   private statusListeners: Set<StatusListener> = new Set();
+  private playerDisconnectListeners: Set<PlayerDisconnectListener> = new Set();
 
   public getCurrentPlayerId(): string | null {
     return this.myPlayerId;
@@ -243,6 +245,15 @@ class MultiplayerService {
 
           this.notifyRoomUpdate(this.currentRoomState);
         })
+        .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+          if (Array.isArray(leftPresences) && this.currentRoomState?.status === 'PLAYING') {
+            leftPresences.forEach((pres: any) => {
+              if (pres?.id && pres.id !== this.myPlayerId) {
+                this.notifyPlayerDisconnect(pres.id, pres.name);
+              }
+            });
+          }
+        })
         .on('broadcast', { event: 'game_action' }, (payload: any) => {
           if (payload?.payload?.action) {
             this.notifyGameAction(payload.payload.action, payload.payload.senderId);
@@ -250,7 +261,15 @@ class MultiplayerService {
         })
         .on('broadcast', { event: 'chat' }, (payload: any) => {
           if (payload?.payload?.message) {
-            this.notifyChat(payload.payload.message);
+            // Verify message sender is part of this active room
+            const msg = payload.payload.message;
+            if (this.currentRoomState) {
+              const isRoomMember = this.currentRoomState.players.some((p) => p.id === msg.senderId);
+              if (!isRoomMember) {
+                return; // Drop chat from outsiders
+              }
+            }
+            this.notifyChat(msg);
           }
         })
         .on('broadcast', { event: 'game_start' }, (payload: any) => {
@@ -396,6 +415,11 @@ class MultiplayerService {
           this.notifyError(payload.message);
         }
         break;
+      case 'PLAYER_DISCONNECTED':
+        if (payload?.playerId) {
+          this.notifyPlayerDisconnect(payload.playerId, payload.playerName);
+        }
+        break;
     }
   }
 
@@ -472,10 +496,10 @@ class MultiplayerService {
     }
   }
 
-  public sendChatMessage(text: string, sender: { name: string; avatar: string; color: string }) {
+  public sendChatMessage(text: string, sender: { id?: string; name: string; avatar: string; color: string }) {
     const message: ChatMessage = {
       id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      senderId: this.myPlayerId || '',
+      senderId: sender.id || this.myPlayerId || this.myPlayer?.id || '',
       senderName: sender.name,
       senderAvatar: sender.avatar,
       senderColor: sender.color,
@@ -569,6 +593,11 @@ class MultiplayerService {
     return () => this.statusListeners.delete(fn);
   }
 
+  public onPlayerDisconnect(fn: PlayerDisconnectListener) {
+    this.playerDisconnectListeners.add(fn);
+    return () => this.playerDisconnectListeners.delete(fn);
+  }
+
   // Notifiers
   private notifyRoomUpdate(room: RoomState) {
     this.roomUpdateListeners.forEach((fn) => fn(room));
@@ -592,6 +621,10 @@ class MultiplayerService {
 
   private notifyStatus(connected: boolean) {
     this.statusListeners.forEach((fn) => fn(connected));
+  }
+
+  public notifyPlayerDisconnect(playerId: string, playerName?: string) {
+    this.playerDisconnectListeners.forEach((fn) => fn(playerId, playerName));
   }
 }
 

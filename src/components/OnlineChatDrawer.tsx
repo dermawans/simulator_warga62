@@ -5,6 +5,7 @@ import { MessageSquare, X, Send, Smile } from 'lucide-react';
 
 interface OnlineChatDrawerProps {
   messages: ChatMessage[];
+  currentUserId?: string;
   currentUserName: string;
   currentUserAvatar: string;
   currentUserColor: string;
@@ -21,6 +22,7 @@ const QUICK_TAUNTS = [
 
 export const OnlineChatDrawer: React.FC<OnlineChatDrawerProps> = ({
   messages,
+  currentUserId,
   currentUserName,
   currentUserAvatar,
   currentUserColor,
@@ -45,6 +47,7 @@ export const OnlineChatDrawer: React.FC<OnlineChatDrawerProps> = ({
     if (!text) return;
 
     multiplayerService.sendChatMessage(text, {
+      id: currentUserId,
       name: currentUserName,
       avatar: currentUserAvatar,
       color: currentUserColor,
@@ -119,7 +122,9 @@ export const OnlineChatDrawer: React.FC<OnlineChatDrawerProps> = ({
               </div>
             ) : (
               messages.map((m) => {
-                const isMe = m.senderName === currentUserName;
+                const isMe = (currentUserId && m.senderId)
+                  ? m.senderId === currentUserId
+                  : m.senderName === currentUserName;
                 return (
                   <div
                     key={m.id}

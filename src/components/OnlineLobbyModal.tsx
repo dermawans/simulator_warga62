@@ -64,6 +64,17 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
         clearTimeout(connectTimeoutRef.current);
         connectTimeoutRef.current = null;
       }
+
+      // Check if room match has already started and this user is not part of the active match
+      const myId = multiplayerService.getCurrentPlayerId();
+      const isPlayerInRoom = room.players.some((p) => p.id === myId);
+      if (room.status === 'PLAYING' && !isPlayerInRoom) {
+        setErrorMessage(`Permainan di Room ${room.code} sudah berjalan. Pertandingan telah dimulai dan tidak menerima pemain baru.`);
+        setIsConnecting(false);
+        multiplayerService.disconnect();
+        return;
+      }
+
       setCurrentRoom(room);
       setViewState('LOBBY');
       setIsConnecting(false);

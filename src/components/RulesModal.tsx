@@ -40,7 +40,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ onClose }) => {
                 <strong>Target Taipan Sultan (Rp 100.000.000)</strong>: Warga pertama yang berhasil mencetak Kekayaan Bersih (Kas + Seluruh Properti) mencapai <strong>Rp 100 Juta</strong> langsung dinobatkan sebagai pemenang tanpa menunggu lawan bangkrut!
               </li>
               <li>
-                <strong>Batas 30 Putaran Selesai</strong>: Jika mencapai 30 putaran, permainan otomatis selesai dan warga dengan Kekayaan Bersih tertinggi keluar sebagai pemenang.
+                <strong>Batas 50 Putaran Selesai</strong>: Jika mencapai 50 putaran, permainan otomatis selesai dan warga dengan Kekayaan Bersih tertinggi keluar sebagai pemenang.
               </li>
             </ul>
           </div>

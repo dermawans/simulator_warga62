@@ -73,6 +73,9 @@ export default function App() {
     totalCashRecovered: number;
   } | null>(null);
   const [hasRolled, setHasRolled] = useState(false);
+  const [doubleRollCount, setDoubleRollCount] = useState<number>(0);
+  const [hasDoubleRollBonus, setHasDoubleRollBonus] = useState<boolean>(false);
+  const [turnTimeLeft, setTurnTimeLeft] = useState<number>(60);
   const [recentLog, setRecentLog] = useState<string>('Selamat datang di Simulator Warga62!');
   const [arisanPot, setArisanPot] = useState<number>(6500000);
   const [roundCount, setRoundCount] = useState<number>(1);
@@ -318,6 +321,59 @@ export default function App() {
     };
   }, [gameState, activePlayerIndex, hasRolled, isRolling, isHopping]);
 
+  // 60-Second Turn Countdown Timer
+  useEffect(() => {
+    if (gameState !== 'PLAYING' || !!gameOverData || isHopping || isRolling) return;
+
+    const timer = window.setInterval(() => {
+      setTurnTimeLeft((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [gameState, gameOverData, isHopping, isRolling, activePlayerIndex]);
+
+  // Turn Timeout (60s AFK) Auto-action Handler
+  useEffect(() => {
+    if (gameState !== 'PLAYING' || !activePlayer || !!gameOverData || isHopping || isRolling) return;
+    if (turnTimeLeft !== 0) return;
+
+    const isMyTurn = !isOnlineMode || isMyTurnOnline;
+    const isHost = multiplayerRoom && multiplayerService.getCurrentPlayerId() === multiplayerRoom.hostId;
+
+    if (isMyTurn) {
+      setRecentLog(`⏱️ Waktu giliran ${activePlayer.name} habis (60s AFK)! Melanjutkan giliran otomatis...`);
+      soundManager.playBoing();
+      if (!hasRolled && !activePlayer.inJail) {
+        handleRollDice();
+      } else {
+        handleEndTurn();
+      }
+    } else if (isHost) {
+      // Host acts as authority to unfreeze room if remote player went AFK
+      const hostTimer = window.setTimeout(() => {
+        if (turnTimeLeft === 0 && !isHopping && !isRolling) {
+          setRecentLog(`⏱️ Waktu giliran ${activePlayer.name} habis (60s AFK)! Host mengalihkan giliran agar match tidak macet.`);
+          handleEndTurn();
+        }
+      }, 2000);
+      return () => clearTimeout(hostTimer);
+    }
+  }, [turnTimeLeft, gameState, activePlayer, isHopping, isRolling, hasRolled, isOnlineMode, isMyTurnOnline, multiplayerRoom]);
+
+  // Window beforeunload: Disconnect cleanly if player closes browser
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (multiplayerRoom && gameState === 'PLAYING') {
+        multiplayerService.disconnect();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [multiplayerRoom, gameState]);
+
   // Remote Multiplayer Listeners
   useEffect(() => {
     const unsubAction = multiplayerService.onGameAction((action, senderId) => {
@@ -361,8 +417,17 @@ export default function App() {
             setTimeout(() => {
               setDiceOverlayState(null);
               setIsRolling(false);
-              setHasRolled(true);
-              movePlayer(validSteps);
+              const isDoubleRemote = validDice[0] === validDice[1];
+              if (isDoubleRemote) {
+                setHasDoubleRollBonus(true);
+                setHasRolled(false);
+                soundManager.playFanfare();
+                setRecentLog(`🎉 DADU KEMBAR [${validDice[0]}, ${validDice[1]}]! ${roller.name} dapat giliran tambahan kocok dadu lagi!`);
+              } else {
+                setHasDoubleRollBonus(false);
+                setHasRolled(true);
+              }
+              movePlayer(validSteps, isDoubleRemote);
             }, 1000);
           }, 650);
           break;
@@ -470,6 +535,9 @@ export default function App() {
           setActivePlayerIndex(action.nextPlayerIndex);
           setRoundCount(action.roundCount);
           setHasRolled(false);
+          setHasDoubleRollBonus(false);
+          setDoubleRollCount(0);
+          setTurnTimeLeft(60);
           setIsRolling(false);
           setIsHopping(false);
           setRecentLog(`Giliran beralih ke ${players[action.nextPlayerIndex]?.name || 'Pemain Berikutnya'}.`);
@@ -580,12 +648,53 @@ export default function App() {
     });
 
     const unsubChat = multiplayerService.onChatMessage((msg) => {
+      // Security filter: Only accept chat from confirmed players in this active room
+      if (multiplayerRoom) {
+        const isMember = multiplayerRoom.players.some((p) => p.id === msg.senderId);
+        if (!isMember) return;
+      }
       setOnlineChatMessages((prev) => [...prev.slice(-25), msg]);
+    });
+
+    // Listen to Player Disconnect (Browser close / connection drop -> declare bankrupt)
+    const unsubDisconnect = multiplayerService.onPlayerDisconnect((playerId, playerName) => {
+      setPlayers((prev) => {
+        const target = prev.find((p) => p.id === playerId);
+        if (!target || target.isBankrupt) return prev;
+
+        const next = prev.map((p) =>
+          p.id === playerId ? { ...p, isBankrupt: true, money: 0 } : p
+        );
+
+        // Liquidate / free up all properties owned by disconnected player
+        setTiles((tPrev) =>
+          tPrev.map((t) => (t.ownerId === playerId ? { ...t, ownerId: null, houses: 0 } : t))
+        );
+
+        soundManager.playBoing();
+        setRecentLog(`🔌 ${playerName || target.name} terputus / keluar dari game! Dinyatakan BANGKRUT & kalah.`);
+
+        // Check if only 1 survivor left (Game Over)
+        const survivors = next.filter((p) => !p.isBankrupt);
+        if (survivors.length <= 1 && survivors.length > 0) {
+          setTimeout(() => {
+            triggerGameOver(survivors[0], 'ELIMINATION', roundCount);
+          }, 600);
+        } else if (prev[activePlayerIndex]?.id === playerId) {
+          // If disconnected player was taking their turn, advance turn immediately!
+          setTimeout(() => {
+            handleEndTurn();
+          }, 800);
+        }
+
+        return next;
+      });
     });
 
     return () => {
       unsubAction();
       unsubChat();
+      unsubDisconnect();
     };
   }, [tiles, players, activePlayerIndex, roundCount, multiplayerRoom]);
 
@@ -648,7 +757,7 @@ export default function App() {
 
   // Roll Dice & Move
   const handleRollDice = (customRoll?: any) => {
-    if (isRolling || hasRolled || isHopping || !activePlayer) return;
+    if (isRolling || (!hasDoubleRollBonus && hasRolled) || isHopping || !activePlayer) return;
     if (isOnlineMode && !isMyTurnOnline) {
       soundManager.playBoing();
       return;
@@ -668,6 +777,33 @@ export default function App() {
     const d1 = isCustom ? customRoll[0] : Math.floor(Math.random() * 6) + 1;
     const d2 = isCustom ? customRoll[1] : Math.floor(Math.random() * 6) + 1;
     const totalSteps = d1 + d2;
+    const isDouble = d1 === d2;
+
+    // Check consecutive double roll rule (3x in a row -> KPK investigation)
+    if (isDouble && doubleRollCount >= 2) {
+      soundManager.playSiren();
+      setTimeout(() => soundManager.playGavel(), 400);
+      setDoubleRollCount(0);
+      setHasDoubleRollBonus(false);
+      setHasRolled(true);
+      setIsRolling(false);
+      setRecentLog(`🚨 TERCYDUK KPK! ${activePlayer.name} kocok dadu kembar 3x berturut-turut (${d1} & ${d2})! Diciduk langsung ke Lapas Sukamiskin.`);
+      setPlayers((prev) => {
+        const next = [...prev];
+        next[activePlayerIndex] = {
+          ...next[activePlayerIndex],
+          inJail: true,
+          jailTurns: 3,
+          position: 24, // Lapas Sukamiskin
+        };
+        return next;
+      });
+      return;
+    }
+
+    const nextDoubleCount = isDouble ? doubleRollCount + 1 : 0;
+    setDoubleRollCount(nextDoubleCount);
+    setHasDoubleRollBonus(isDouble);
 
     // Phase 1: Show rolling shaker/tumbling modal
     setDiceOverlayState({
@@ -704,13 +840,16 @@ export default function App() {
       setTimeout(() => {
         setDiceOverlayState(null);
         setIsRolling(false);
-        setHasRolled(true);
-        movePlayer(totalSteps);
+        if (isDouble) {
+          soundManager.playFanfare();
+          setRecentLog(`🎉 DADU KEMBAR [${d1}, ${d2}]! ${activePlayer.name} berhak KELILING LAGI / KOCOK DADU SEKALI LAGI!`);
+        }
+        movePlayer(totalSteps, isDouble);
       }, 1100);
     }, 700);
   };
 
-  const movePlayer = (steps: number) => {
+  const movePlayer = (steps: number, isDouble = false) => {
     if (!activePlayer) return;
 
     // Safety fallback: ensure steps is always a positive integer
@@ -786,6 +925,14 @@ export default function App() {
           setIsHopping(false);
           setHoppingPlayerId(null);
           setStepHighlightedTileId(null);
+
+          if (isDouble) {
+            setHasRolled(false); // Enable rolling again!
+            setHasDoubleRollBonus(true);
+          } else {
+            setHasRolled(true);
+            setHasDoubleRollBonus(false);
+          }
 
           // Trigger Tile Landing Event on the final player state
           setPlayers((latest) => {
@@ -1569,8 +1716,8 @@ export default function App() {
       }
     }
 
-    // Condition C: Rounds limit completed (30 rounds)
-    if (roundCount >= 30) {
+    // Condition C: Rounds limit completed (50 rounds)
+    if (roundCount >= 50) {
       const sorted = [...activeSurvivors].sort(
         (a, b) => calculateNetWorth(b) - calculateNetWorth(a)
       );
@@ -1591,11 +1738,14 @@ export default function App() {
     if (nextIdx === 0) {
       nextRound = roundCount + 1;
       setRoundCount(nextRound);
-      setRecentLog(`🔔 Putaran ke-${nextRound}/30 dimulai! Persaingan semakin panas.`);
+      setRecentLog(`🔔 Putaran ke-${nextRound}/50 dimulai! Persaingan semakin panas.`);
     }
 
     setActivePlayerIndex(nextIdx);
     setHasRolled(false);
+    setHasDoubleRollBonus(false);
+    setDoubleRollCount(0);
+    setTurnTimeLeft(60);
     setRecentLog(`Giliran beralih ke ${players[nextIdx].name}.`);
 
     if (multiplayerRoom) {
@@ -1665,10 +1815,10 @@ export default function App() {
         ) : (
           <div className="w-full space-y-4">
             {/* Round & Victory Target Status Banner */}
-            <div className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 p-2.5 px-4 rounded-2xl border-2 border-slate-900 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+            <div className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 p-2.5 px-3 sm:px-4 rounded-2xl border-2 border-slate-900 flex flex-wrap items-center justify-between gap-2 shadow-xs">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="px-2.5 py-0.5 bg-slate-950 text-yellow-300 font-black font-comic text-xs rounded-full uppercase tracking-wider">
-                  Putaran {roundCount}/30
+                  Putaran {roundCount}/50
                 </span>
                 <span className="text-xs font-black text-slate-950 font-comic">
                   🏆 Syarat Menang: Jadi Sultan Rp 100 Jt atau Singkirkan Seluruh Lawan Hingga Bangkrut!
@@ -1686,6 +1836,8 @@ export default function App() {
             <EconomyTicker
               condition={currentEconomic}
               turnCountdown={economicTurnCountdown}
+              currentRound={roundCount}
+              maxRounds={50}
             />
 
             {/* Players Status Overview Bar (Spacious cards with NO text cutoff) */}
@@ -1726,8 +1878,8 @@ export default function App() {
                   activePlayer={activePlayer}
                   tiles={tiles}
                   currentTile={currentTile}
-                  canRoll={!hasRolled && !isRolling && !isHopping && !activePlayer.inJail && isMyTurnOnline}
-                  canEndTurn={(hasRolled || activePlayer.inJail) && !isRolling && !isHopping && isMyTurnOnline}
+                  canRoll={(!hasRolled || hasDoubleRollBonus) && !isRolling && !isHopping && !activePlayer.inJail && isMyTurnOnline}
+                  canEndTurn={!hasDoubleRollBonus && (hasRolled || activePlayer.inJail) && !isRolling && !isHopping && isMyTurnOnline}
                   canBuyProperty={
                     hasRolled &&
                     !isRolling &&
@@ -1758,6 +1910,8 @@ export default function App() {
                   isOnlineMode={isOnlineMode}
                   isMyTurnOnline={isMyTurnOnline}
                   myOnlinePlayer={myOnlinePlayer}
+                  isDoubleRoll={hasDoubleRollBonus}
+                  turnTimeLeft={turnTimeLeft}
                 />
               </div>
             </div>
@@ -1891,31 +2045,6 @@ export default function App() {
         />
       )}
 
-      {/* 12. Floating START Salary Notification Popup on Viewport */}
-      {startBonusPopup && (
-        <div
-          key={`viewport-start-${startBonusPopup.id}`}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-slide-up-float"
-        >
-          <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border-2 sm:border-3 border-slate-950 shadow-2xl flex items-center gap-2.5 sm:gap-3 comic-box-sm animate-pulse-glow">
-            <span className="text-2xl sm:text-3xl animate-bounce">💵</span>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-xs sm:text-sm font-black font-comic text-yellow-300 drop-shadow-sm whitespace-nowrap">
-                  {startBonusPopup.text}
-                </span>
-                <span className="text-[9px] bg-emerald-950 text-emerald-200 px-1.5 py-0.2 rounded font-mono font-bold uppercase">
-                  PETAK START
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-emerald-100 font-bold leading-tight">
-                {startBonusPopup.playerName} ({startBonusPopup.subtext || 'Gaji Pokok WNI'})
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 13. Save / Load Progress Modal (Supabase Cloud + Local Backup) */}
       <SaveLoadModal
         isOpen={saveLoadModalOpen}
@@ -1946,9 +2075,10 @@ export default function App() {
       {multiplayerRoom && gameState === 'PLAYING' && (
         <OnlineChatDrawer
           messages={onlineChatMessages}
-          currentUserName={activePlayer?.name || 'Warga'}
-          currentUserAvatar={activePlayer?.avatarEmoji || '🇮🇩'}
-          currentUserColor={activePlayer?.color || '#0284c7'}
+          currentUserId={myOnlinePlayer?.id || currentMyId || ''}
+          currentUserName={myOnlinePlayer?.name || 'Warga'}
+          currentUserAvatar={myOnlinePlayer?.avatarEmoji || '🇮🇩'}
+          currentUserColor={myOnlinePlayer?.color || '#0284c7'}
         />
       )}
 
